@@ -309,29 +309,63 @@ const machine = setup({
   },
   {
     title: 'Traffic Light',
-    description: 'A simple traffic light with timed transitions',
+    description: 'Timed traffic light with nested red states for pedestrian crossing and turn arrows',
     format: 'xstate',
     code: `import { setup } from 'xstate';
 
 const machine = setup({
   types: {
-    events: {} as { type: 'NEXT' },
+    events: {} as
+      | { type: 'NEXT' }
+      | { type: 'PEDESTRIAN_REQUEST' }
+      | { type: 'EMERGENCY' }
+      | { type: 'RESET' },
   },
 }).createMachine({
   id: 'trafficLight',
   initial: 'green',
   states: {
     green: {
-      after: { 3000: { target: 'yellow' } },
-      on: { NEXT: { target: 'yellow' } },
+      after: { 5000: { target: 'yellow' } },
+      on: {
+        NEXT: { target: 'yellow' },
+        EMERGENCY: { target: 'red.flash' },
+      },
     },
     yellow: {
-      after: { 1000: { target: 'red' } },
-      on: { NEXT: { target: 'red' } },
+      after: { 2000: { target: 'red' } },
+      on: {
+        NEXT: { target: 'red' },
+        EMERGENCY: { target: 'red.flash' },
+      },
     },
     red: {
-      after: { 4000: { target: 'green' } },
-      on: { NEXT: { target: 'green' } },
+      initial: 'waiting',
+      on: {
+        EMERGENCY: { target: '.flash' },
+      },
+      states: {
+        waiting: {
+          on: {
+            PEDESTRIAN_REQUEST: { target: 'pedestrianCrossing' },
+          },
+          after: { 3000: { target: 'turnArrow' } },
+        },
+        pedestrianCrossing: {
+          after: { 4000: { target: 'turnArrow' } },
+        },
+        turnArrow: {
+          after: { 3000: { target: 'clearance' } },
+        },
+        clearance: {
+          after: { 1000: { target: '#trafficLight.green' } },
+        },
+        flash: {
+          on: {
+            RESET: { target: '#trafficLight.green' },
+          },
+        },
+      },
     },
   },
 });`,

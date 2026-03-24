@@ -759,214 +759,61 @@ export function getDefaultMachine(): AnyStateMachine {
   return result.machines[0];
 }
 
-export const defaultMachineCode = `import { setup, assign, sendTo, raise, fromPromise, fromCallback, and, not } from 'xstate';
+export const defaultMachineCode = `import { setup } from 'xstate';
 
 const machine = setup({
   types: {
-    context: {} as {
-      retries: number;
-      result: string | null;
-    },
     events: {} as
-      | { type: 'FETCH' }
-      | { type: 'RESOLVE'; data: string }
-      | { type: 'REJECT'; error: string }
-      | { type: 'RETRY' }
-      | { type: 'CANCEL' }
-      | { type: 'RESET' }
-      | { type: 'TICK' }
-      | { type: 'MODE_SWITCH' },
-  },
-  actions: {
-    notifyUser: () => {},
-    logError: () => {},
-    clearResult: assign({ result: null }),
-    incrementRetries: assign({
-      retries: ({ context }) => context.retries + 1,
-    }),
-    setResult: assign({
-      result: (_, params: { data: string }) => params.data,
-    }),
-    resetContext: assign({ retries: 0, result: null }),
-  },
-  guards: {
-    canRetry: ({ context }) => context.retries < 3,
-    hasResult: ({ context }) => context.result !== null,
-    isOverLimit: ({ context }) => context.retries >= 3,
-  },
-  actors: {
-    fetchData: fromPromise(async () => {
-      return 'fetched data';
-    }),
-    pollService: fromCallback(({ sendBack }) => {
-      const id = setInterval(() => sendBack({ type: 'TICK' }), 1000);
-      return () => clearInterval(id);
-    }),
-  },
-  delays: {
-    RETRY_DELAY: 2000,
-    IDLE_TIMEOUT: 30000,
+      | { type: 'NEXT' }
+      | { type: 'PEDESTRIAN_REQUEST' }
+      | { type: 'EMERGENCY' }
+      | { type: 'RESET' },
   },
 }).createMachine({
-  id: 'omni',
-  description: 'Comprehensive machine demonstrating all XState features',
-  initial: 'idle',
-  context: {
-    retries: 0,
-    result: null,
-  },
-  on: {
-    RESET: {
-      target: '.idle',
-      actions: ['resetContext'],
-      description: 'Global reset to idle',
-    },
-  },
+  id: 'trafficLight',
+  initial: 'green',
   states: {
-    idle: {
-      description: 'Waiting for user action',
-      tags: ['stable'],
-      after: {
-        IDLE_TIMEOUT: 'timedOut',
-      },
+    green: {
+      after: { 5000: { target: 'yellow' } },
       on: {
-        FETCH: 'loading',
-        MODE_SWITCH: 'parallel',
+        NEXT: { target: 'yellow' },
+        EMERGENCY: { target: 'red.flash' },
       },
     },
-    loading: {
-      description: 'Fetching data from remote service',
-      tags: ['busy'],
-      entry: ['notifyUser'],
-      invoke: {
-        src: 'fetchData',
-        onDone: {
-          target: 'processing',
-          actions: assign({
-            result: ({ event }) => event.output,
-          }),
-        },
-        onError: [
-          {
-            target: 'retrying',
-            guard: 'canRetry',
-            actions: ['logError', 'incrementRetries'],
-          },
-          {
-            target: 'failed',
-            description: 'No retries left',
-          },
-        ],
-      },
+    yellow: {
+      after: { 2000: { target: 'red' } },
       on: {
-        CANCEL: 'idle',
+        NEXT: { target: 'red' },
+        EMERGENCY: { target: 'red.flash' },
       },
     },
-    retrying: {
-      description: 'Waiting before retry attempt',
-      entry: ['notifyUser'],
-      after: {
-        RETRY_DELAY: 'loading',
-      },
+    red: {
+      initial: 'waiting',
       on: {
-        CANCEL: 'idle',
-      },
-    },
-    processing: {
-      description: 'Evaluating the fetched result',
-      always: [
-        {
-          target: 'success',
-          guard: 'hasResult',
-        },
-        {
-          target: 'failed',
-          description: 'No result available',
-        },
-      ],
-    },
-    success: {
-      description: 'Operation completed successfully',
-      tags: ['stable', 'done'],
-      entry: ['notifyUser'],
-      on: {
-        FETCH: {
-          target: 'loading',
-          actions: ['clearResult'],
-        },
-      },
-    },
-    failed: {
-      description: 'Operation failed',
-      tags: ['error'],
-      entry: ['logError'],
-      on: {
-        RETRY: [
-          {
-            target: 'loading',
-            guard: and(['canRetry', not('isOverLimit')]),
-            actions: ['incrementRetries'],
-            description: 'Retry if under limit',
-          },
-          {
-            target: 'failed',
-            description: 'Already over retry limit',
-          },
-        ],
-      },
-    },
-    parallel: {
-      description: 'Parallel region with independent processes',
-      type: 'parallel',
-      on: {
-        MODE_SWITCH: 'idle',
+        EMERGENCY: { target: '.flash' },
       },
       states: {
-        monitor: {
-          initial: 'watching',
-          states: {
-            watching: {
-              description: 'Actively monitoring',
-              invoke: {
-                src: 'pollService',
-              },
-              on: {
-                TICK: {
-                  actions: raise({ type: 'FETCH' }),
-                  description: 'Received heartbeat',
-                },
-              },
-            },
-            hist: {
-              type: 'history',
-              history: 'shallow',
-            },
+        waiting: {
+          on: {
+            PEDESTRIAN_REQUEST: { target: 'pedestrianCrossing' },
           },
+          after: { 3000: { target: 'turnArrow' } },
         },
-        status: {
-          initial: 'ok',
-          states: {
-            ok: {
-              description: 'All systems operational',
-              tags: ['healthy'],
-              on: {
-                REJECT: 'degraded',
-              },
-            },
-            degraded: {
-              description: 'Partial failure detected',
-              tags: ['warning'],
-              on: {
-                RESOLVE: 'ok',
-              },
-            },
+        pedestrianCrossing: {
+          after: { 4000: { target: 'turnArrow' } },
+        },
+        turnArrow: {
+          after: { 3000: { target: 'clearance' } },
+        },
+        clearance: {
+          after: { 1000: { target: '#trafficLight.green' } },
+        },
+        flash: {
+          on: {
+            RESET: { target: '#trafficLight.green' },
           },
         },
       },
-    },
-    timedOut: {
-      description: 'Session timed out due to inactivity',
-      type: 'final',
     },
   },
 });

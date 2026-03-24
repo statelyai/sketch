@@ -1,7 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-import appCss from '../styles.css?url'
+import '../styles.css'
 
 const queryClient = new QueryClient()
 
@@ -26,10 +26,6 @@ export const Route = createRootRoute({
       },
     ],
     links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
       {
         rel: 'icon',
         href: '/icon.svg',
