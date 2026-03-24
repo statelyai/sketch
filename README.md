@@ -1,6 +1,8 @@
 # Stately Sketch
 
-Stately Sketch is a responsive state machine visualizer and simulator for XState. It is designed as an alternative to infinite-canvas tooling: code stays close to the diagram, the layout works on smaller screens, and simulation stays readable on desktop and mobile.
+Stately Sketch is a simple, responsive state machine visualizer and simulator for XState.
+
+<img width="2306" height="1523" alt="localhost_3000_ (3)" src="https://github.com/user-attachments/assets/61cae159-b6bd-49b5-b9e3-3dd9ac9e65f4" />
 
 ## What It Does
 
@@ -11,31 +13,22 @@ Stately Sketch is a responsive state machine visualizer and simulator for XState
 
 ## Run It Locally
 
-### Prerequisites
-
-- Node.js 22+
-- `pnpm` 10+
-
-### Install
-
 ```bash
+# Install dependencies
 pnpm install
-```
 
-### Start The App
-
-```bash
+# Run it
 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Open [`http://localhost:3000`](http://localhost:3000)
 
-### Run Checks
+## Run Checks
 
 ```bash
-pnpm test
-pnpm build
-pnpm test:e2e
+pnpm test # runs unit tests
+pnpm test:e2e # runs Playwright E2E tests
+pnpm build 
 ```
 
 ## Environment
@@ -45,10 +38,9 @@ Sketch works locally without extra setup. If you want to point the app at differ
 ```bash
 VITE_STATELY_BASE_URL=https://stately.ai
 VITE_REGISTRY_API_URL=https://stately.ai/registry/api/v1/viz
-DB_PATH=sketch.db
 ```
 
-`VITE_REGISTRY_API_URL` overrides the default registry API path. `DB_PATH` controls the local SQLite file used by the built-in share routes.
+`VITE_REGISTRY_API_URL` overrides the default registry API path.
 
 ## Development Notes
 
@@ -58,8 +50,11 @@ DB_PATH=sketch.db
 
 ## Open Source
 
-Issues and pull requests are welcome. Start with `CONTRIBUTING.md`, use the issue templates, and keep changes scoped and well-tested.
+Issues and (non AI-generated) pull requests are welcome. Start with `CONTRIBUTING.md`, use the issue templates, and keep changes scoped and well-tested. 
 
-## Self-Hosting
+> [!IMPORTANT]
+> Open an issue with context/prompt instead of opening an AI-generated PR. I can run Codex/Claude/etc myself.
 
-Self-hosting is possible, but the default experience is intentionally aligned with Stately services. For a custom deployment, you will need to provide your own hosting setup, storage strategy, and any registry/auth endpoints you want the UI to target.
+## License
+
+MIT
