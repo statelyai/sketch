@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -56,6 +56,18 @@ export function CodePanel({
       }
     }
   }, [onCodeChange]);
+
+  // Sync editor content when code prop changes externally (e.g. example selection)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const editorContent = view.state.doc.toString();
+    if (editorContent !== code) {
+      view.dispatch({
+        changes: { from: 0, to: editorContent.length, insert: code },
+      });
+    }
+  }, [code]);
 
   const editorRefCallback = useCallback(
     (node: HTMLDivElement | null) => {
