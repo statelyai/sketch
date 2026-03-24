@@ -58,7 +58,7 @@ import {
   ApiError,
 } from '@/lib/api';
 import { examples } from '@/lib/examples';
-import { getCurrentSimValue } from '@/lib/store';
+
 
 const BAR_CLASSES = 'flex shrink-0 items-center h-11 px-4';
 const MOBILE_BREAKPOINT = 768;
@@ -90,7 +90,7 @@ export function AppLayout() {
   const isMobile = useIsMobile();
   const mobileTab = useSelector(appStore, (s) => s.context.mobileTab);
   const editorTab = useSelector(appStore, (s) => s.context.editorTab);
-  const simEvents = useSelector(appStore, (s) => s.context.simEvents);
+
   const sharing = useSelector(appStore, (s) => s.context.sharing);
   const user = useSelector(appStore, (s) => s.context.user);
   const nameModalOpen = useSelector(appStore, (s) => s.context.nameModalOpen);
@@ -606,10 +606,6 @@ export function AppLayout() {
                 code={code}
                 dark={dark}
                 format={format}
-                simEvents={simEvents}
-                simValue={getCurrentSimValue()}
-                isSimulating={isSim}
-                onStartSim={handleStartSim}
                 activeTab={editorTab}
                 onActiveTabChange={(tab) => appStore.trigger.setEditorTab({ tab })}
                 onCodeChange={(newCode) => {
@@ -682,10 +678,6 @@ export function AppLayout() {
               code={code}
               dark={dark}
               format={format}
-              simEvents={simEvents}
-              simValue={getCurrentSimValue()}
-              isSimulating={isSim}
-              onStartSim={handleStartSim}
               activeTab={editorTab}
               onActiveTabChange={(tab) => appStore.trigger.setEditorTab({ tab })}
               onCodeChange={handleCodeChange}

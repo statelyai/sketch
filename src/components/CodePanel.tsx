@@ -5,9 +5,8 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Play } from 'lucide-react';
+import { SimulationPanel } from '@/components/SimulationPanel';
 import type { CodeFormat } from '@/lib/machine';
-import type { SimEvent } from '@/lib/store';
 
 interface CodePanelProps {
   code: string;
@@ -15,10 +14,6 @@ interface CodePanelProps {
   error: string | null;
   dark?: boolean;
   format?: CodeFormat;
-  simEvents: SimEvent[];
-  simValue: string | null;
-  isSimulating: boolean;
-  onStartSim: () => void;
   activeTab: string | number;
   onActiveTabChange: (tab: string | number) => void;
 }
@@ -37,10 +32,6 @@ export function CodePanel({
   error,
   dark,
   format,
-  simEvents,
-  simValue,
-  isSimulating,
-  onStartSim,
   activeTab,
   onActiveTabChange,
 }: CodePanelProps) {
@@ -176,65 +167,7 @@ export function CodePanel({
       </TabsContent>
 
       <TabsContent value="simulation" className="min-h-0 flex-1 overflow-auto">
-        <div className="flex min-h-full flex-col">
-          <div className="border-b border-border px-3 py-2">
-            <h3 className="text-xs font-medium text-foreground">Event History</h3>
-          </div>
-          {!isSimulating ? (
-            <div className="flex flex-1 items-center justify-center px-6 text-center">
-              <div>
-                <button
-                  type="button"
-                  onClick={onStartSim}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                  aria-label="Start simulation from panel"
-                >
-                  <Play size={14} />
-                  Start simulation
-                </button>
-              </div>
-            </div>
-          ) : simEvents.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center px-6 text-center">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  No simulation events yet
-                </p>
-                <p className="mt-1 text-[0.75rem] text-muted-foreground">
-                  Start simulation and trigger transitions to inspect the event stream.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div data-testid="simulation-event-list" className="flex flex-col gap-2 p-3">
-              {simEvents.map((simEvent, index) => (
-                <div
-                  key={`${simEvent.timestamp}-${index}`}
-                  className="rounded-md border border-border bg-background px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-foreground">
-                      {simEvent.event.type}
-                    </span>
-                    <span className="text-[0.625rem] text-muted-foreground">
-                      {new Date(simEvent.timestamp).toLocaleTimeString([], {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[0.6875rem] text-muted-foreground">
-                    value:{' '}
-                    <code className="font-mono text-[0.6875rem] text-foreground">
-                      {simValue ?? 'null'}
-                    </code>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <SimulationPanel />
       </TabsContent>
     </Tabs>
   );

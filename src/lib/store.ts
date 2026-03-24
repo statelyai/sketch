@@ -122,7 +122,7 @@ function getSimMachine(
   return machine.provide(implementations);
 }
 
-function computeSimSnapshot(
+export function computeSimSnapshot(
   machine: AnyStateMachine,
   events: SimEvent[],
 ): AnyMachineSnapshot {
