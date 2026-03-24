@@ -471,7 +471,7 @@ export const appStore = createStore({
         ...context,
         mode: 'sim' as const,
         simMachine,
-        simEvents: [],
+        simEvents: [{ timestamp: Date.now(), event: { type: 'xstate.init' } }],
         simActiveIds: getActiveIds(snapshot),
       };
     },

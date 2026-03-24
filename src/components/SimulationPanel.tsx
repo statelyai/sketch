@@ -1,7 +1,7 @@
 import { Play } from 'lucide-react';
 import { useSelector } from '@xstate/store/react';
 import { appStore, computeSimSnapshot } from '@/lib/store';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 function formatEventType(type: string): string {
   // "xstate.after.2000.trafficLight.yellow" → "after 2000ms"
@@ -75,6 +75,12 @@ export function SimulationPanel() {
     );
   }
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [simEvents.length]);
+
   return (
     <div className="flex min-h-full flex-col">
       <div className="border-b border-border px-3 py-2">
@@ -106,6 +112,7 @@ export function SimulationPanel() {
             </div>
           </div>
         ))}
+        <div ref={bottomRef} />
       </div>
     </div>
   );
