@@ -5,23 +5,36 @@ test.describe('Examples', () => {
     await page.goto('/');
   });
 
-  test('shows examples tab in code panel', async ({ page }) => {
-    const examplesTab = page.getByRole('tab', { name: 'Examples' });
-    await expect(examplesTab).toBeVisible();
+  test('opens examples in a modal from the header', async ({ page }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'Examples' })).toBeVisible();
   });
 
-  test('lists all examples when examples tab clicked', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+  test('shows realistic xstate examples first in the modal list', async ({ page }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
+
+    const exampleButtons = page.locator('[data-testid="example-list"] button');
+    await expect(exampleButtons.nth(0)).toContainText('Session Timeout');
+    await expect(exampleButtons.nth(1)).toContainText('OTP Verification');
+    await expect(exampleButtons.nth(2)).toContainText('Checkout');
+  });
+
+  test('lists examples in the modal', async ({ page }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
 
     // Check example buttons are listed (use role='button' to avoid strict mode)
     await expect(
+      page.getByRole('button', { name: /Session Timeout/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /OTP Verification/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Checkout/ }),
+    ).toBeVisible();
+    await expect(
       page.getByRole('button', { name: /Traffic Light/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Vending Machine/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Drag & Drop/ }),
     ).toBeVisible();
     await expect(
       page.getByRole('button', { name: /Authentication/ }),
@@ -56,7 +69,7 @@ test.describe('Examples', () => {
   });
 
   test('loads Traffic Light example', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Traffic Light/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('trafficLight');
@@ -72,7 +85,7 @@ test.describe('Examples', () => {
   });
 
   test('loads Vending Machine example (JSON format)', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Vending Machine/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('vendingMachine');
@@ -87,7 +100,7 @@ test.describe('Examples', () => {
   });
 
   test('loads Promise example (YAML format)', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Promise/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('promise');
@@ -105,7 +118,7 @@ test.describe('Examples', () => {
   });
 
   test('loads Authentication example with nested states', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Authentication/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('auth');
@@ -120,17 +133,17 @@ test.describe('Examples', () => {
     ).toBeVisible();
   });
 
-  test('switches back to Code tab after selecting example', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
-    await page.getByRole('button', { name: /Stopwatch/ }).click();
+  test('returns to Code tab after selecting example from modal', async ({ page }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: /Session Timeout/ }).click();
 
-    // Should auto-switch to code tab — check aria-selected
     const codeTab = page.getByRole('tab', { name: 'Code' });
     await expect(codeTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('dialog', { name: 'Examples' })).toHaveCount(0);
   });
 
   test('loads Door Lock example (Mermaid state diagram)', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Door Lock/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('machine');
@@ -148,7 +161,7 @@ test.describe('Examples', () => {
   });
 
   test('loads Order Process example (Mermaid flowchart)', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Order Process/ }).click();
 
     await expect(page.getByTestId('machine-name')).toHaveText('machine');
@@ -163,7 +176,7 @@ test.describe('Examples', () => {
   });
 
   test('can simulate Traffic Light example', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: 'Examples' }).click();
     await page.getByRole('button', { name: /Traffic Light/ }).click();
     await expect(page.getByTestId('machine-name')).toHaveText('trafficLight');
 
@@ -183,5 +196,16 @@ test.describe('Examples', () => {
         '[data-state-id="trafficLight.yellow"] [data-sim-active]',
       ),
     ).toBeVisible();
+  });
+
+  test('loads Session Timeout example and shows xstate format', async ({ page }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: /Session Timeout/ }).click();
+
+    await expect(page.getByTestId('machine-name')).toHaveText('sessionTimeout');
+    await expect(
+      page.locator('[data-state-id="sessionTimeout.active"]'),
+    ).toBeVisible();
+    await expect(page.getByTestId('format-badge')).toHaveText('XState');
   });
 });

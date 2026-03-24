@@ -9,6 +9,305 @@ export interface Example {
 
 export const examples: Example[] = [
   {
+    title: 'Session Timeout',
+    description: 'Warn an inactive user, extend the session, or sign them out automatically',
+    format: 'xstate',
+    code: `import { setup } from 'xstate';
+
+const machine = setup({
+  types: {
+    events: {} as
+      | { type: 'USER_ACTIVITY' }
+      | { type: 'EXTEND_SESSION' }
+      | { type: 'DISMISS_WARNING' }
+      | { type: 'SIGN_OUT' },
+  },
+}).createMachine({
+  id: 'sessionTimeout',
+  initial: 'active',
+  states: {
+    active: {
+      after: {
+        120000: {
+          target: 'warning',
+        },
+      },
+      on: {
+        USER_ACTIVITY: {
+          target: 'active',
+        },
+        SIGN_OUT: {
+          target: 'signedOut',
+        },
+      },
+    },
+    warning: {
+      after: {
+        30000: {
+          target: 'signedOut',
+        },
+      },
+      on: {
+        EXTEND_SESSION: {
+          target: 'active',
+        },
+        DISMISS_WARNING: {
+          target: 'active',
+        },
+        USER_ACTIVITY: {
+          target: 'active',
+        },
+        SIGN_OUT: {
+          target: 'signedOut',
+        },
+      },
+    },
+    signedOut: {
+      type: 'final',
+    },
+  },
+});`,
+  },
+  {
+    title: 'OTP Verification',
+    description: 'Handle code entry, resend cooldowns, expiration, and lockout after failed attempts',
+    format: 'xstate',
+    code: `import { setup, assign } from 'xstate';
+
+const machine = setup({
+  types: {
+    context: {} as {
+      attempts: number;
+      resendCount: number;
+    },
+    events: {} as
+      | { type: 'SUBMIT_CODE' }
+      | { type: 'CODE_VALID' }
+      | { type: 'CODE_INVALID' }
+      | { type: 'RESEND_CODE' }
+      | { type: 'EDIT_NUMBER' },
+  },
+}).createMachine({
+  id: 'otpVerification',
+  initial: 'enteringCode',
+  context: {
+    attempts: 0,
+    resendCount: 0,
+  },
+  states: {
+    enteringCode: {
+      initial: 'ready',
+      states: {
+        ready: {
+          after: {
+            90000: {
+              target: '#otpVerification.expired',
+            },
+          },
+          on: {
+            SUBMIT_CODE: {
+              target: 'verifying',
+            },
+            RESEND_CODE: {
+              target: 'cooldown',
+              actions: assign({
+                resendCount: ({ context }) => context.resendCount + 1,
+              }),
+            },
+            EDIT_NUMBER: {
+              target: '#otpVerification.editingNumber',
+            },
+          },
+        },
+        verifying: {
+          on: {
+            CODE_VALID: {
+              target: '#otpVerification.verified',
+            },
+            CODE_INVALID: [
+              {
+                guard: ({ context }) => context.attempts >= 2,
+                target: '#otpVerification.locked',
+              },
+              {
+                target: 'ready',
+                actions: assign({
+                  attempts: ({ context }) => context.attempts + 1,
+                }),
+              },
+            ],
+          },
+        },
+        cooldown: {
+          after: {
+            30000: {
+              target: 'ready',
+            },
+          },
+        },
+      },
+    },
+    editingNumber: {
+      on: {
+        RESEND_CODE: {
+          target: 'enteringCode.cooldown',
+        },
+      },
+    },
+    verified: {
+      type: 'final',
+    },
+    expired: {
+      on: {
+        RESEND_CODE: {
+          target: 'enteringCode.cooldown',
+        },
+      },
+    },
+    locked: {
+      on: {
+        EDIT_NUMBER: {
+          target: 'editingNumber',
+        },
+      },
+    },
+  },
+});`,
+  },
+  {
+    title: 'Checkout',
+    description: 'Reserve inventory, process payment, and time out while waiting for confirmation',
+    format: 'xstate',
+    code: `import { setup } from 'xstate';
+
+const machine = setup({
+  types: {
+    events: {} as
+      | { type: 'SUBMIT_ORDER' }
+      | { type: 'INVENTORY_RESERVED' }
+      | { type: 'OUT_OF_STOCK' }
+      | { type: 'PAYMENT_APPROVED' }
+      | { type: 'PAYMENT_DECLINED' }
+      | { type: 'RETRY_PAYMENT' }
+      | { type: 'ORDER_CONFIRMED' }
+      | { type: 'CANCEL' },
+  },
+}).createMachine({
+  id: 'checkout',
+  initial: 'reviewingCart',
+  states: {
+    reviewingCart: {
+      on: {
+        SUBMIT_ORDER: {
+          target: 'reservingInventory',
+        },
+      },
+    },
+    reservingInventory: {
+      after: {
+        15000: {
+          target: 'inventoryTimeout',
+        },
+      },
+      on: {
+        INVENTORY_RESERVED: {
+          target: 'processingPayment',
+        },
+        OUT_OF_STOCK: {
+          target: 'inventoryUnavailable',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    processingPayment: {
+      after: {
+        20000: {
+          target: 'paymentTimeout',
+        },
+      },
+      on: {
+        PAYMENT_APPROVED: {
+          target: 'awaitingConfirmation',
+        },
+        PAYMENT_DECLINED: {
+          target: 'paymentFailed',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    awaitingConfirmation: {
+      after: {
+        10000: {
+          target: 'confirmationDelayed',
+        },
+      },
+      on: {
+        ORDER_CONFIRMED: {
+          target: 'completed',
+        },
+      },
+    },
+    paymentFailed: {
+      on: {
+        RETRY_PAYMENT: {
+          target: 'processingPayment',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    inventoryUnavailable: {
+      on: {
+        SUBMIT_ORDER: {
+          target: 'reservingInventory',
+        },
+      },
+    },
+    inventoryTimeout: {
+      on: {
+        SUBMIT_ORDER: {
+          target: 'reservingInventory',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    paymentTimeout: {
+      on: {
+        RETRY_PAYMENT: {
+          target: 'processingPayment',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    confirmationDelayed: {
+      on: {
+        ORDER_CONFIRMED: {
+          target: 'completed',
+        },
+        CANCEL: {
+          target: 'cancelled',
+        },
+      },
+    },
+    completed: {
+      type: 'final',
+    },
+    cancelled: {
+      type: 'final',
+    },
+  },
+});`,
+  },
+  {
     title: 'Traffic Light',
     description: 'A simple traffic light with timed transitions',
     format: 'xstate',
@@ -23,16 +322,16 @@ const machine = setup({
   initial: 'green',
   states: {
     green: {
-      after: { 3000: 'yellow' },
-      on: { NEXT: 'yellow' },
+      after: { 3000: { target: 'yellow' } },
+      on: { NEXT: { target: 'yellow' } },
     },
     yellow: {
-      after: { 1000: 'red' },
-      on: { NEXT: 'red' },
+      after: { 1000: { target: 'red' } },
+      on: { NEXT: { target: 'red' } },
     },
     red: {
-      after: { 4000: 'green' },
-      on: { NEXT: 'green' },
+      after: { 4000: { target: 'green' } },
+      on: { NEXT: { target: 'green' } },
     },
   },
 });`,
@@ -117,8 +416,12 @@ const machine = setup({
             dy: ({ event }) => event.y,
           }),
         },
-        pointerup: 'idle',
-        'keydown.escape': 'idle',
+        pointerup: {
+          target: 'idle',
+        },
+        'keydown.escape': {
+          target: 'idle',
+        },
       },
     },
   },
@@ -206,42 +509,64 @@ const machine = setup({
   states: {
     stopped: {
       on: {
-        PLAY: 'playing',
-        LOAD: 'loading',
+        PLAY: {
+          target: 'playing',
+        },
+        LOAD: {
+          target: 'loading',
+        },
       },
     },
     loading: {
       on: {
-        LOADED: 'stopped',
-        ERROR: 'error',
+        LOADED: {
+          target: 'stopped',
+        },
+        ERROR: {
+          target: 'error',
+        },
       },
     },
     playing: {
       initial: 'buffering',
       on: {
-        PAUSE: 'paused',
-        END: 'stopped',
-        ERROR: 'error',
+        PAUSE: {
+          target: 'paused',
+        },
+        END: {
+          target: 'stopped',
+        },
+        ERROR: {
+          target: 'error',
+        },
       },
       states: {
         buffering: {
-          on: { BUFFERED: 'ready' },
+          on: { BUFFERED: { target: 'ready' } },
         },
         ready: {
-          on: { NEED_BUFFER: 'buffering' },
+          on: { NEED_BUFFER: { target: 'buffering' } },
         },
       },
     },
     paused: {
       on: {
-        PLAY: 'playing',
-        STOP: 'stopped',
+        PLAY: {
+          target: 'playing',
+        },
+        STOP: {
+          target: 'stopped',
+        },
       },
     },
     error: {
       on: {
-        RETRY: 'loading',
-        DISMISS: 'stopped',
+        RETRY: {
+          target: 'loading',
+        },
+        DISMISS: {
+          target: 'stopped',
+        },
       },
     },
   },
@@ -284,21 +609,35 @@ const machine = setup({
   states: {
     stopped: {
       on: {
-        START: 'running',
-        RESET: 'stopped',
+        START: {
+          target: 'running',
+        },
+        RESET: {
+          target: 'stopped',
+        },
       },
     },
     running: {
       on: {
-        STOP: 'paused',
-        LAP: 'running',
-        RESET: 'stopped',
+        STOP: {
+          target: 'paused',
+        },
+        LAP: {
+          target: 'running',
+        },
+        RESET: {
+          target: 'stopped',
+        },
       },
     },
     paused: {
       on: {
-        START: 'running',
-        RESET: 'stopped',
+        START: {
+          target: 'running',
+        },
+        RESET: {
+          target: 'stopped',
+        },
       },
     },
   },

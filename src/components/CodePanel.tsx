@@ -1,12 +1,13 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { examples } from '@/lib/examples';
+import { Play } from 'lucide-react';
 import type { CodeFormat } from '@/lib/machine';
+import type { SimEvent } from '@/lib/store';
 
 interface CodePanelProps {
   code: string;
@@ -14,6 +15,12 @@ interface CodePanelProps {
   error: string | null;
   dark?: boolean;
   format?: CodeFormat;
+  simEvents: SimEvent[];
+  simValue: string | null;
+  isSimulating: boolean;
+  onStartSim: () => void;
+  activeTab: string | number;
+  onActiveTabChange: (tab: string | number) => void;
 }
 
 const FORMAT_LABELS: Record<CodeFormat, string> = {
@@ -24,11 +31,22 @@ const FORMAT_LABELS: Record<CodeFormat, string> = {
   mermaid: 'Mermaid',
 };
 
-export function CodePanel({ code, onCodeChange, error, dark, format }: CodePanelProps) {
+export function CodePanel({
+  code,
+  onCodeChange,
+  error,
+  dark,
+  format,
+  simEvents,
+  simValue,
+  isSimulating,
+  onStartSim,
+  activeTab,
+  onActiveTabChange,
+}: CodePanelProps) {
   const viewRef = useRef<EditorView | null>(null);
   const codeRef = useRef(code);
   codeRef.current = code;
-  const [tab, setTab] = useState<string | number>('code');
 
   const handleCommit = useCallback(() => {
     if (viewRef.current) {
@@ -102,14 +120,14 @@ export function CodePanel({ code, onCodeChange, error, dark, format }: CodePanel
 
   return (
     <Tabs
-      value={tab}
-      onValueChange={setTab}
+      value={activeTab}
+      onValueChange={onActiveTabChange}
       data-testid="code-panel"
       className="flex h-full flex-col overflow-hidden border-l border-border bg-card"
     >
       <TabsList variant="line" className="w-full shrink-0 border-b border-border px-2">
         <TabsTrigger value="code">Code</TabsTrigger>
-        <TabsTrigger value="examples">Examples</TabsTrigger>
+        <TabsTrigger value="simulation">Simulation</TabsTrigger>
         {format && (
           <span data-testid="format-badge" className="ml-auto self-center rounded bg-muted px-1.5 py-0.5 text-[0.625rem] font-medium text-muted-foreground">
             {FORMAT_LABELS[format]}
@@ -145,32 +163,65 @@ export function CodePanel({ code, onCodeChange, error, dark, format }: CodePanel
         </div>
       </TabsContent>
 
-      <TabsContent value="examples" className="min-h-0 flex-1 overflow-auto">
-        <div data-testid="example-list" className="flex flex-col gap-1 p-2">
-          {examples.map((example) => (
-            <button
-              key={example.title}
-              type="button"
-              data-testid={`example-${example.title.toLowerCase().replace(/\s+/g, '-')}`}
-              onClick={() => {
-                onCodeChange(example.code);
-                setTab('code');
-              }}
-              className="group flex cursor-pointer flex-col items-start gap-0.5 rounded-md border border-transparent px-3 py-2 text-left transition-colors hover:border-border hover:bg-accent"
-            >
-              <div className="flex w-full items-center gap-2">
-                <span className="text-xs font-medium text-foreground">
-                  {example.title}
-                </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[0.5625rem] font-medium text-muted-foreground">
-                  {FORMAT_LABELS[example.format]}
-                </span>
+      <TabsContent value="simulation" className="min-h-0 flex-1 overflow-auto">
+        <div className="flex min-h-full flex-col">
+          <div className="border-b border-border px-3 py-2">
+            <h3 className="text-xs font-medium text-foreground">Event History</h3>
+          </div>
+          {!isSimulating ? (
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div>
+                <button
+                  type="button"
+                  onClick={onStartSim}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                  aria-label="Start simulation from panel"
+                >
+                  <Play size={14} />
+                  Start simulation
+                </button>
               </div>
-              <span className="text-[0.6875rem] text-muted-foreground">
-                {example.description}
-              </span>
-            </button>
-          ))}
+            </div>
+          ) : simEvents.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  No simulation events yet
+                </p>
+                <p className="mt-1 text-[0.75rem] text-muted-foreground">
+                  Start simulation and trigger transitions to inspect the event stream.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div data-testid="simulation-event-list" className="flex flex-col gap-2 p-3">
+              {simEvents.map((simEvent, index) => (
+                <div
+                  key={`${simEvent.timestamp}-${index}`}
+                  className="rounded-md border border-border bg-background px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-foreground">
+                      {simEvent.event.type}
+                    </span>
+                    <span className="text-[0.625rem] text-muted-foreground">
+                      {new Date(simEvent.timestamp).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[0.6875rem] text-muted-foreground">
+                    value:{' '}
+                    <code className="font-mono text-[0.6875rem] text-foreground">
+                      {simValue ?? 'null'}
+                    </code>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </TabsContent>
     </Tabs>

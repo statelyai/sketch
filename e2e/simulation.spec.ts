@@ -70,6 +70,55 @@ test.describe('Simulation mode', () => {
     ).toHaveCount(0);
   });
 
+  test('shows simulation event history in the side panel', async ({ page }) => {
+    await page.getByLabel('Start simulation').click();
+    await page.locator('text=FETCH').first().click();
+
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+
+    const eventList = page.getByTestId('simulation-event-list');
+    await expect(eventList).toBeVisible();
+    await expect(eventList.getByText('FETCH')).toBeVisible();
+    await expect(eventList.getByText(/value:/)).toBeVisible();
+  });
+
+  test('switches the open right panel to simulation when simulation starts', async ({ page }) => {
+    await expect(page.getByRole('tab', { name: 'Code' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await page.getByLabel('Start simulation').click();
+
+    await expect(page.getByRole('tab', { name: 'Simulation' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('can start simulation from the simulation panel', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start simulation from panel' }).click();
+
+    await expect(page.getByLabel('Stop simulation')).toBeVisible();
+    await expect(page.locator('[data-state-id="omni.idle"] [data-sim-active]')).toBeVisible();
+  });
+
+  test('returns the right panel to code after simulation stops', async ({ page }) => {
+    await page.getByLabel('Start simulation').click();
+    await expect(page.getByRole('tab', { name: 'Simulation' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await page.getByLabel('Stop simulation').click();
+
+    await expect(page.getByRole('tab', { name: 'Code' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
   test('transitions reduce opacity for inactive states', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
 

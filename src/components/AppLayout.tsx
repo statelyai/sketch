@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useSyncExternalStore,
-  useState,
 } from 'react';
 import { useSelector } from '@xstate/store-react';
 import type {
@@ -59,6 +58,7 @@ import {
   ApiError,
 } from '@/lib/api';
 import { examples } from '@/lib/examples';
+import { getCurrentSimValue } from '@/lib/store';
 
 const BAR_CLASSES = 'flex shrink-0 items-center h-11 px-4';
 const MOBILE_BREAKPOINT = 768;
@@ -88,12 +88,14 @@ export function AppLayout() {
   const groupRef = useRef<GroupImperativeHandle>(null);
   const vizScrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  const [mobileTab, setMobileTab] = useState<string | number>('viz');
-  const simActiveIds = useSelector(appStore, (s) => s.context.simActiveIds);
+  const mobileTab = useSelector(appStore, (s) => s.context.mobileTab);
+  const editorTab = useSelector(appStore, (s) => s.context.editorTab);
+  const simEvents = useSelector(appStore, (s) => s.context.simEvents);
   const sharing = useSelector(appStore, (s) => s.context.sharing);
   const user = useSelector(appStore, (s) => s.context.user);
-  const [nameModalOpen, setNameModalOpen] = useState(false);
-  const [nameInput, setNameInput] = useState('');
+  const nameModalOpen = useSelector(appStore, (s) => s.context.nameModalOpen);
+  const nameInput = useSelector(appStore, (s) => s.context.nameInput);
+  const examplesOpen = useSelector(appStore, (s) => s.context.examplesOpen);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -124,20 +126,41 @@ export function AppLayout() {
     }
   }, []);
 
-  // Scroll to first active leaf node in sim mode
+  // Scroll to first active leaf node when a sim event comes in
   useEffect(() => {
-    if (mode !== 'sim' || simActiveIds.size === 0) return;
-    const container = vizScrollRef.current;
-    if (!container) return;
-    const el = container.querySelector('[data-sim-active]');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [mode, simActiveIds]);
+    const scrollToActive = () => {
+      const container = vizScrollRef.current;
+      if (!container) return;
+      const el = container.querySelector('[data-sim-active]');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    };
+    const subs = [
+      appStore.on('simSend', scrollToActive),
+      appStore.on('startSim', scrollToActive),
+      appStore.on('restartSim', scrollToActive),
+    ];
+    return () => subs.forEach((sub) => sub.unsubscribe());
+  }, []);
 
   const handleCodeChange = useCallback((newCode: string) => {
     appStore.trigger.updateFromCode({ code: newCode });
   }, []);
+
+  const handleStartSim = useCallback(() => {
+    appStore.trigger.startSim();
+    if (!isMobile && panelOpen && editorTab === 'code') {
+      appStore.trigger.setEditorTab({ tab: 'simulation' });
+    }
+  }, [editorTab, isMobile, panelOpen]);
+
+  const handleStopSim = useCallback(() => {
+    appStore.trigger.stopSim();
+    if (!isMobile) {
+      appStore.trigger.setEditorTab({ tab: 'code' });
+    }
+  }, [isMobile]);
 
   const togglePanel = useCallback(() => {
     appStore.trigger.setDrawerOpen({ open: !panelOpen });
@@ -146,8 +169,8 @@ export function AppLayout() {
   const handleShareClick = useCallback(() => {
     const { graph, sketchName } = appStore.getSnapshot().context;
     if (!graph) return;
-    setNameInput(sketchName || '');
-    setNameModalOpen(true);
+    appStore.trigger.setNameInput({ input: sketchName || '' });
+    appStore.trigger.setNameModalOpen({ open: true });
   }, []);
 
   const handleShareConfirm = useCallback(async () => {
@@ -156,7 +179,7 @@ export function AppLayout() {
 
     const name = nameInput.trim() || 'Sketch';
     appStore.trigger.setSketchName({ name });
-    setNameModalOpen(false);
+    appStore.trigger.setNameModalOpen({ open: false });
 
     appStore.trigger.setSharing({ status: 'saving' });
     try {
@@ -253,7 +276,7 @@ export function AppLayout() {
               <Tooltip>
                 <TooltipTrigger
                   className="flex size-8 cursor-pointer items-center justify-center rounded-full border-none bg-foreground text-background transition-opacity hover:opacity-85"
-                  onClick={() => appStore.trigger.stopSim()}
+                  onClick={handleStopSim}
                   aria-label="Stop simulation"
                 >
                   <Square size={14} />
@@ -265,7 +288,7 @@ export function AppLayout() {
             <Tooltip>
               <TooltipTrigger
                 className="flex size-8 cursor-pointer items-center justify-center rounded-full border-none bg-foreground text-background transition-opacity hover:opacity-85"
-                onClick={() => appStore.trigger.startSim()}
+                onClick={handleStartSim}
                 aria-label="Start simulation"
               >
                 <Play size={14} />
@@ -324,6 +347,13 @@ export function AppLayout() {
         </a>
 
         <div className="flex items-center gap-2">
+          <button
+            className="inline-flex cursor-pointer items-center gap-1.5 px-0 py-1.5 text-xs font-medium text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+            onClick={() => appStore.trigger.setExamplesOpen({ open: true })}
+            aria-label="Examples"
+          >
+            Examples
+          </button>
           {!isEmpty && (
             <button
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
@@ -441,7 +471,7 @@ export function AppLayout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/10 backdrop-blur-xs"
-            onClick={() => setNameModalOpen(false)}
+            onClick={() => appStore.trigger.setNameModalOpen({ open: false })}
           />
           <div className="relative z-10 w-full max-w-sm border border-border bg-background p-4 shadow-md">
             <h3 className="mb-1 text-sm font-medium text-foreground">Name your sketch</h3>
@@ -451,18 +481,18 @@ export function AppLayout() {
             <input
               type="text"
               value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
+              onChange={(e) => appStore.trigger.setNameInput({ input: e.target.value })}
               placeholder="Unnamed Sketch"
               autoFocus
               className="mb-3 h-8 w-full border border-border bg-card px-2.5 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleShareConfirm();
-                if (e.key === 'Escape') setNameModalOpen(false);
+                if (e.key === 'Escape') appStore.trigger.setNameModalOpen({ open: false });
               }}
             />
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setNameModalOpen(false)}
+                onClick={() => appStore.trigger.setNameModalOpen({ open: false })}
                 className="cursor-pointer rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
               >
                 Cancel
@@ -478,11 +508,78 @@ export function AppLayout() {
         </div>
       )}
 
+      {examplesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/10 backdrop-blur-xs"
+            onClick={() => appStore.trigger.setExamplesOpen({ open: false })}
+          />
+          <div
+            role="dialog"
+            aria-label="Examples"
+            className="relative z-10 flex max-h-[min(42rem,80vh)] w-full max-w-2xl flex-col border border-border bg-background shadow-md"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h3 className="text-sm font-medium text-foreground">Examples</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Load a realistic machine or a format demo into the editor.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => appStore.trigger.setExamplesOpen({ open: false })}
+                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                Close
+              </button>
+            </div>
+            <div data-testid="example-list" className="grid gap-1 overflow-auto p-2">
+              {examples.map((example) => (
+                <button
+                  key={example.title}
+                  type="button"
+                  data-testid={`example-${example.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={() => {
+                    appStore.trigger.updateFromCode({ code: example.code });
+                    appStore.trigger.setExamplesOpen({ open: false });
+                    if (!isMobile) {
+                      appStore.trigger.setEditorTab({ tab: 'code' });
+                    }
+                  }}
+                  className="group flex cursor-pointer flex-col items-start gap-0.5 rounded-md border border-transparent px-3 py-2 text-left transition-colors hover:border-border hover:bg-accent"
+                >
+                  <div className="flex w-full items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">
+                      {example.title}
+                    </span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[0.5625rem] font-medium text-muted-foreground">
+                      {example.format === 'xstate'
+                        ? 'XState'
+                        : example.format === 'json'
+                          ? 'JSON'
+                          : example.format === 'yaml'
+                            ? 'YAML'
+                            : example.format === 'mermaid'
+                              ? 'Mermaid'
+                              : 'Sketch'}
+                    </span>
+                  </div>
+                  <span className="text-[0.6875rem] text-muted-foreground">
+                    {example.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       {isMobile ? (
         <Tabs
           value={mobileTab}
-          onValueChange={setMobileTab}
+          onValueChange={(tab) => appStore.trigger.setMobileTab({ tab })}
           className="flex min-h-0 flex-col"
         >
           <TabsContent value="viz" className="flex min-h-0 flex-1 flex-col">
@@ -495,9 +592,15 @@ export function AppLayout() {
                 code={code}
                 dark={dark}
                 format={format}
+                simEvents={simEvents}
+                simValue={getCurrentSimValue()}
+                isSimulating={isSim}
+                onStartSim={handleStartSim}
+                activeTab={editorTab}
+                onActiveTabChange={(tab) => appStore.trigger.setEditorTab({ tab })}
                 onCodeChange={(newCode) => {
                   handleCodeChange(newCode);
-                  setMobileTab('viz');
+                  appStore.trigger.setMobileTab({ tab: 'viz' });
                 }}
                 error={error}
               />
@@ -565,6 +668,12 @@ export function AppLayout() {
               code={code}
               dark={dark}
               format={format}
+              simEvents={simEvents}
+              simValue={getCurrentSimValue()}
+              isSimulating={isSim}
+              onStartSim={handleStartSim}
+              activeTab={editorTab}
+              onActiveTabChange={(tab) => appStore.trigger.setEditorTab({ tab })}
               onCodeChange={handleCodeChange}
               error={error}
             />

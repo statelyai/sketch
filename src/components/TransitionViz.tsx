@@ -14,7 +14,8 @@ import {
   getActiveTimerProgress,
 } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
+import { useTick } from '@/lib/useTick';
 
 interface TransitionVizProps {
   edge: GraphEdge<TransitionData>;
@@ -44,12 +45,7 @@ export function TransitionViz({
   const highlightedIdsRef = useRef<string[]>([]);
 
   // Tick to animate progress bar for active after-timers
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!isSim || eventCategory !== 'after') return;
-    const id = setInterval(() => setTick((t) => t + 1), 50);
-    return () => clearInterval(id);
-  }, [isSim, eventCategory]);
+  useTick(isSim && eventCategory === 'after');
 
   const timerProgress =
     isSim && eventCategory === 'after'

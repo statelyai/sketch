@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { getSourceFile, type SourceFileData } from '@/lib/api';
+import { getSourceFile } from '@/lib/api';
 import { appStore } from '@/lib/store';
 
 export const Route = createFileRoute('/viz/$sourceFileId')({
@@ -10,17 +11,16 @@ export const Route = createFileRoute('/viz/$sourceFileId')({
 
 function VizRoute() {
   const { sourceFileId } = Route.useParams();
-  const [error, setError] = useState(false);
+  const { data, error } = useQuery({
+    queryKey: ['sourceFile', sourceFileId],
+    queryFn: () => getSourceFile(sourceFileId),
+  });
 
   useEffect(() => {
-    getSourceFile(sourceFileId)
-      .then((data: SourceFileData) => {
-        appStore.trigger.updateFromCode({ code: data.text });
-        appStore.trigger.setSourceFileId({ id: data.id });
-        appStore.trigger.setSketchName({ name: data.name });
-      })
-      .catch(() => setError(true));
-  }, [sourceFileId]);
+    if (data) {
+      appStore.trigger.sourceFileChanged({ code: data.text, id: data.id, name: data.name });
+    }
+  }, [data]);
 
   if (error) {
     return (

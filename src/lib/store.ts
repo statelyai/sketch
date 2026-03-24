@@ -225,6 +225,13 @@ export function getNextSimAllIds(event: AnyEventObject): Set<string> {
   return new Set(nodes.map((n) => n.id));
 }
 
+export function getCurrentSimValue(): string | null {
+  const ctx = appStore.getSnapshot().context;
+  if (!ctx.simMachine || ctx.mode !== 'sim') return null;
+  const snapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents);
+  return JSON.stringify(snapshot.value);
+}
+
 function getInitialContext() {
   try {
     const machine = getDefaultMachine();
@@ -268,6 +275,12 @@ export const appStore = createStore({
     sharing: 'idle' as 'idle' | 'saving' | 'copied' | 'error',
     sketchName: '' as string,
     user: null as UserData | null,
+    // UI
+    mobileTab: 'viz' as string | number,
+    editorTab: 'code' as string | number,
+    nameModalOpen: false,
+    nameInput: '',
+    examplesOpen: false,
     // Simulation
     mode: 'view' as 'view' | 'sim',
     machine: initialCtx.machine,
@@ -319,6 +332,38 @@ export const appStore = createStore({
       ...context,
       machine: event.machine,
     }),
+    sourceFileChanged: (context, event: { code: string; id: string; name: string }) => {
+      const format = detectFormat(event.code);
+      const result = parseCode(event.code, format);
+
+      const base = {
+        ...context,
+        mode: 'view' as const,
+        simMachine: null,
+        simEvents: [] as SimEvent[],
+        simActiveIds: new Set<string>(),
+        code: event.code,
+        format,
+        sourceFileId: event.id,
+        sketchName: event.name,
+      };
+
+      if (result.error) {
+        return { ...base, error: result.error };
+      }
+
+      if (result.machines.length === 0) {
+        return { ...base, machine: null, graph: null, error: 'No machine found in code' };
+      }
+
+      try {
+        const machine = result.machines[0];
+        const graph = machineToGraph(machine);
+        return { ...base, machine, graph, error: null };
+      } catch (e) {
+        return { ...base, machine: null, graph: null, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
     updateFromCode: (context, event: { code: string }) => {
       const format = detectFormat(event.code);
       const result = parseCode(event.code, format);
@@ -381,6 +426,26 @@ export const appStore = createStore({
         };
       }
     },
+    setMobileTab: (context, event: { tab: string | number }) => ({
+      ...context,
+      mobileTab: event.tab,
+    }),
+    setEditorTab: (context, event: { tab: string | number }) => ({
+      ...context,
+      editorTab: event.tab,
+    }),
+    setNameModalOpen: (context, event: { open: boolean }) => ({
+      ...context,
+      nameModalOpen: event.open,
+    }),
+    setNameInput: (context, event: { input: string }) => ({
+      ...context,
+      nameInput: event.input,
+    }),
+    setExamplesOpen: (context, event: { open: boolean }) => ({
+      ...context,
+      examplesOpen: event.open,
+    }),
     toggleDark: (context) => ({
       ...context,
       dark: !context.dark,
@@ -448,19 +513,6 @@ export const appStore = createStore({
       if (nextActions.length > 0) {
         enq.effect(() => applySimActions(nextActions as SimAction[]));
       }
-      console.groupCollapsed(
-        `[sim] ${event.event.type}: ${JSON.stringify(prevSnapshot.value)} → ${JSON.stringify(nextSnapshot.value)}`,
-      );
-      console.log('event', event.event);
-      console.log('prev', {
-        value: prevSnapshot.value,
-        context: prevSnapshot.context,
-      });
-      console.log('next', {
-        value: nextSnapshot.value,
-        context: nextSnapshot.context,
-      });
-      console.groupEnd();
       return {
         ...context,
         simEvents: nextEvents,

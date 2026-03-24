@@ -26,9 +26,14 @@ test.describe('App loading', () => {
 
   test('renders code editor panel on desktop', async ({ page }) => {
     await page.goto('/');
-    // Code panel has tabs for Code and Examples
+    // Code panel has tabs for Code and Simulation
     await expect(page.getByRole('tab', { name: 'Code' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Examples' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Simulation' })).toBeVisible();
+  });
+
+  test('renders examples launcher in header', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('header').getByRole('button', { name: 'Examples' })).toBeVisible();
   });
 
   test('renders simulation controls', async ({ page }) => {
