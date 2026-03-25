@@ -19,6 +19,6 @@ This applies within project spaces and in public spaces when someone is represen
 
 ## Reporting
 
-Report conduct issues to `opensource@stately.ai`.
+Report conduct issues to `support@stately.ai`.
 
 For the full Contributor Covenant text, see [contributor-covenant.org](https://www.contributor-covenant.org/).

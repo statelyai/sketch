@@ -7,7 +7,7 @@ pnpm install
 pnpm dev
 ```
 
-## Before Opening A PR
+## Before opening a PR
 
 Run:
 
@@ -23,6 +23,7 @@ pnpm test:e2e
 - Add or update tests when behavior changes.
 - Preserve existing product decisions around Stately integration unless the change explicitly targets that area.
 - Use issue templates for bugs and feature proposals when possible.
+- ⚠️ **Do not open AI-generated PRs.** I prefer you open an issue with context/prompt instead of opening an AI-generated PR. I can run Codex/Claude/etc myself.
 
 ## Pull Requests
 

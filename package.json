@@ -1,6 +1,6 @@
 {
   "name": "@statelyai/sketch",
-  "description": "A responsive state machine visualizer and simulator for XState.",
+  "description": "A simple state machine visualizer and simulator for XState.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.32.1",
@@ -14,10 +14,12 @@
   },
   "keywords": [
     "xstate",
+    "state-machine",
     "state-machines",
+    "statechart",
     "visualizer",
     "simulator",
-    "stately"
+    "statelyai"
   ],
   "scripts": {
     "dev": "vite dev",

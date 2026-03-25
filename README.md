@@ -31,23 +31,6 @@ pnpm test:e2e # runs Playwright E2E tests
 pnpm build 
 ```
 
-## Environment
-
-Sketch works locally without extra setup. If you want to point the app at different Stately services while developing, create `.env.development` with any of the following:
-
-```bash
-VITE_STATELY_BASE_URL=https://stately.ai
-VITE_REGISTRY_API_URL=https://stately.ai/registry/api/v1/viz
-```
-
-`VITE_REGISTRY_API_URL` overrides the default registry API path.
-
-## Development Notes
-
-- `pnpm test` runs the Vitest unit suite only.
-- `pnpm test:e2e` runs the Playwright browser suite.
-- Shared sketches are persisted through the local server routes in `server/routes/api/viz`.
-
 ## Open Source
 
 Issues and (non AI-generated) pull requests are welcome. Start with `CONTRIBUTING.md`, use the issue templates, and keep changes scoped and well-tested. 
