@@ -4,7 +4,7 @@ test.describe('Simulation mode', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     // Wait for machine to render
-    await expect(page.locator('[data-state-id="omni.idle"]')).toBeVisible();
+    await expect(page.locator('[data-state-id="trafficLight.green"]')).toBeVisible();
   });
 
   test('starts simulation when play button clicked', async ({ page }) => {
@@ -18,9 +18,9 @@ test.describe('Simulation mode', () => {
   test('highlights initial state in simulation', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
 
-    // The initial state "idle" should be marked as sim-active
-    const idleNode = page.locator('[data-state-id="omni.idle"] [data-sim-active]');
-    await expect(idleNode).toBeVisible();
+    // The initial state "green" should be marked as sim-active
+    const greenNode = page.locator('[data-state-id="trafficLight.green"] [data-sim-active]');
+    await expect(greenNode).toBeVisible();
   });
 
   test('stops simulation when stop button clicked', async ({ page }) => {
@@ -38,48 +38,48 @@ test.describe('Simulation mode', () => {
   test('restarts simulation', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
 
-    // idle should be active initially
-    const idleActive = page.locator(
-      '[data-state-id="omni.idle"] [data-sim-active]',
+    // green should be active initially
+    const greenActive = page.locator(
+      '[data-state-id="trafficLight.green"] [data-sim-active]',
     );
-    await expect(idleActive).toBeVisible();
+    await expect(greenActive).toBeVisible();
 
     await page.getByLabel('Restart simulation').click();
 
-    // Should still be in sim mode with idle active
+    // Should still be in sim mode with green active
     await expect(page.getByLabel('Stop simulation')).toBeVisible();
-    await expect(idleActive).toBeVisible();
+    await expect(greenActive).toBeVisible();
   });
 
   test('transitions state on event click', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
 
-    // Find and click the FETCH transition
-    const fetchTransition = page.locator('text=FETCH').first();
-    await fetchTransition.click();
+    // Find and click the NEXT transition
+    const nextTransition = page.locator('text=NEXT').first();
+    await nextTransition.click();
 
-    // loading state should now be sim-active
-    const loadingActive = page.locator(
-      '[data-state-id="omni.loading"] [data-sim-active]',
+    // yellow state should now be sim-active
+    const yellowActive = page.locator(
+      '[data-state-id="trafficLight.yellow"] [data-sim-active]',
     );
-    await expect(loadingActive).toBeVisible();
+    await expect(yellowActive).toBeVisible();
 
-    // idle should no longer be active
+    // green should no longer be active
     await expect(
-      page.locator('[data-state-id="omni.idle"] [data-sim-active]'),
+      page.locator('[data-state-id="trafficLight.green"] [data-sim-active]'),
     ).toHaveCount(0);
   });
 
   test('shows simulation event history in the side panel', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
-    await page.locator('text=FETCH').first().click();
+    await page.locator('text=NEXT').first().click();
 
     await page.getByRole('tab', { name: 'Simulation' }).click();
 
     const eventList = page.getByTestId('simulation-event-list');
     await expect(eventList).toBeVisible();
-    await expect(eventList.getByText('FETCH')).toBeVisible();
-    await expect(eventList.getByText(/value:/)).toBeVisible();
+    await expect(eventList.getByText('NEXT')).toBeVisible();
+    await expect(eventList.getByText(/value:/).first()).toBeVisible();
   });
 
   test('switches the open right panel to simulation when simulation starts', async ({ page }) => {
@@ -101,7 +101,7 @@ test.describe('Simulation mode', () => {
     await page.getByRole('button', { name: 'Start simulation from panel' }).click();
 
     await expect(page.getByLabel('Stop simulation')).toBeVisible();
-    await expect(page.locator('[data-state-id="omni.idle"] [data-sim-active]')).toBeVisible();
+    await expect(page.locator('[data-state-id="trafficLight.green"] [data-sim-active]')).toBeVisible();
   });
 
   test('returns the right panel to code after simulation stops', async ({ page }) => {
@@ -122,12 +122,10 @@ test.describe('Simulation mode', () => {
   test('transitions reduce opacity for inactive states', async ({ page }) => {
     await page.getByLabel('Start simulation').click();
 
-    // In sim mode, transitions on non-active states should have reduced opacity
-    // The FETCH transition on idle (active state) should NOT have opacity-40
-    // While RETRY on failed (inactive state) should
-    const inactiveTransition = page.locator(
-      '[data-state-id="omni.failed"]',
+    // In sim mode, inactive states should still be visible
+    const inactiveState = page.locator(
+      '[data-state-id="trafficLight.red"]',
     );
-    await expect(inactiveTransition).toBeVisible();
+    await expect(inactiveState).toBeVisible();
   });
 });

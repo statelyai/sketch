@@ -8,7 +8,7 @@ test.describe('App loading', () => {
 
   test('renders default machine visualization', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('machine-name')).toHaveText('omni');
+    await expect(page.getByTestId('machine-name')).toHaveText('trafficLight');
   });
 
   test('renders state nodes from default machine', async ({ page }) => {
@@ -18,10 +18,9 @@ test.describe('App loading', () => {
     await expect(stateNodes.first()).toBeVisible();
 
     // Check for known states from default machine
-    await expect(page.locator('[data-state-id="omni.idle"]')).toBeVisible();
-    await expect(page.locator('[data-state-id="omni.loading"]')).toBeVisible();
-    await expect(page.locator('[data-state-id="omni.success"]')).toBeVisible();
-    await expect(page.locator('[data-state-id="omni.failed"]')).toBeVisible();
+    await expect(page.locator('[data-state-id="trafficLight.green"]')).toBeVisible();
+    await expect(page.locator('[data-state-id="trafficLight.yellow"]')).toBeVisible();
+    await expect(page.locator('[data-state-id="trafficLight.red"]')).toBeVisible();
   });
 
   test('renders code editor panel on desktop', async ({ page }) => {

@@ -22,6 +22,7 @@ export function SimulationPanel() {
   const isSimulating = useSelector(appStore, (s) => s.context.mode === 'sim');
   const simEvents = useSelector(appStore, (s) => s.context.simEvents);
   const simMachine = useSelector(appStore, (s) => s.context.simMachine);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const eventStates = useMemo(() => {
     if (!simMachine || simEvents.length === 0) return [];
@@ -31,6 +32,10 @@ export function SimulationPanel() {
       return JSON.stringify(snapshot.value);
     });
   }, [simMachine, simEvents]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [simEvents.length]);
 
   if (!isSimulating) {
     return (
@@ -74,12 +79,6 @@ export function SimulationPanel() {
       </div>
     );
   }
-
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [simEvents.length]);
 
   return (
     <div className="flex min-h-full flex-col">
