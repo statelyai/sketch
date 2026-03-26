@@ -1,6 +1,9 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
+import { yaml } from '@codemirror/lang-yaml';
+import { mermaid } from 'codemirror-lang-mermaid';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
@@ -71,9 +74,13 @@ export function CodePanel({
 
       const extensions = [
         basicSetup,
-        ...(format === 'xstate' || format === 'json'
-          ? [javascript({ typescript: format === 'xstate' })]
-          : []),
+        ...({
+          xstate: [javascript({ typescript: true })],
+          json: [json()],
+          yaml: [yaml()],
+          mermaid: [mermaid()],
+          sketch: [],
+        }[format!] ?? []),
         ...(dark ? [oneDark] : []),
         EditorView.theme({
           '&': {
