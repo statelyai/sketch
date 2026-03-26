@@ -327,12 +327,23 @@ const XSTATE_PARAM_NAMES = [
 ] as const;
 
 /**
- * Strip import statements for 'xstate' since we inject bindings as fn params.
+ * Strip xstate imports (we inject bindings as fn params) and ESM export syntax
+ * so code can be evaluated via `new Function()`.
  */
-function stripXStateImports(code: string): string {
+function stripImportsAndExports(code: string): string {
   return code
+    // import { ... } from 'xstate'
     .replace(/import\s*\{[^}]*\}\s*from\s*['"]xstate['"]\s*;?/g, '')
-    .replace(/import\s*\*\s*as\s+\w+\s*from\s*['"]xstate['"]\s*;?/g, '');
+    // import * as x from 'xstate'
+    .replace(/import\s*\*\s*as\s+\w+\s*from\s*['"]xstate['"]\s*;?/g, '')
+    // export default ...
+    .replace(/^\s*export\s+default\s+/gm, '')
+    // export const/let/var/function/class
+    .replace(/^\s*export\s+(const|let|var|function|class)\b/gm, '$1')
+    // export { ... }
+    .replace(/^\s*export\s*\{[^}]*\}\s*;?\s*$/gm, '')
+    // export * from '...'
+    .replace(/^\s*export\s*\*\s*from\s*['"][^'"]+['"]\s*;?\s*$/gm, '');
 }
 
 /**
@@ -369,7 +380,7 @@ export function parseXStateMachineCode(code: string): {
     } as any;
 
     const jsCode = tsBlankSpace(code);
-    const strippedCode = stripXStateImports(jsCode);
+    const strippedCode = stripImportsAndExports(jsCode);
     const fn = new Function(...XSTATE_PARAM_NAMES, strippedCode);
 
     fn(
