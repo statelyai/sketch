@@ -16,14 +16,13 @@ interface CodePanelProps {
   onCodeChange: (code: string) => void;
   error: string | null;
   dark?: boolean;
-  format?: CodeFormat;
+  format?: CodeFormat | null;
   activeTab: string | number;
   onActiveTabChange: (tab: string | number) => void;
 }
 
 const FORMAT_LABELS: Record<CodeFormat, string> = {
   xstate: 'XState',
-  sketch: 'Sketch',
   json: 'JSON',
   yaml: 'YAML',
   mermaid: 'Mermaid',
@@ -74,13 +73,14 @@ export function CodePanel({
 
       const extensions = [
         basicSetup,
-        ...({
-          xstate: [javascript({ typescript: true })],
-          json: [json()],
-          yaml: [yaml()],
-          mermaid: [mermaid()],
-          sketch: [],
-        }[format!] ?? []),
+        ...(format
+          ? ({
+              xstate: [javascript({ typescript: true })],
+              json: [json()],
+              yaml: [yaml()],
+              mermaid: [mermaid()],
+            }[format] ?? [])
+          : []),
         ...(dark ? [oneDark] : []),
         EditorView.theme({
           '&': {

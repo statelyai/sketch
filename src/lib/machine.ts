@@ -410,14 +410,14 @@ export function parseXStateMachineCode(code: string): {
   }
 }
 
-export type CodeFormat = 'xstate' | 'sketch' | 'json' | 'yaml' | 'mermaid';
+export type CodeFormat = 'xstate' | 'json' | 'yaml' | 'mermaid';
 
 /**
  * Auto-detect the format of the code string.
  */
-export function detectFormat(code: string): CodeFormat {
+export function detectFormat(code: string): CodeFormat | null {
   const trimmed = code.trim();
-  if (!trimmed) return 'sketch';
+  if (!trimmed) return null;
 
   // Mermaid: starts with stateDiagram, flowchart, or graph direction
   if (
@@ -444,7 +444,7 @@ export function detectFormat(code: string): CodeFormat {
   if (hasColonKeys && !hasArrows) return 'yaml';
 
   // Default: sketch DSL
-  return 'sketch';
+  return null;
 }
 
 /**
@@ -716,14 +716,12 @@ export function parseMermaidCode(code: string): {
 /**
  * Parse code in any supported format.
  */
-export function parseCode(code: string, format?: CodeFormat): {
+export function parseCode(code: string, format?: CodeFormat | null): {
   machines: AnyStateMachine[];
   error: string | null;
 } {
   const fmt = format ?? detectFormat(code);
   switch (fmt) {
-    case 'sketch':
-      return parseSketchCode(code);
     case 'json':
       return parseJSONCode(code);
     case 'yaml':
@@ -732,6 +730,8 @@ export function parseCode(code: string, format?: CodeFormat): {
       return parseXStateMachineCode(code);
     case 'mermaid':
       return parseMermaidCode(code);
+    default:
+      return parseSketchCode(code);
   }
 }
 

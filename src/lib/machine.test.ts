@@ -8,7 +8,7 @@ describe('detectFormat', () => {
   idle*
     FETCH -> loading
   loading`),
-    ).toBe('sketch');
+    ).toBeNull();
   });
 
   it('detects Mermaid diagrams', () => {

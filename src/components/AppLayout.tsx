@@ -185,7 +185,7 @@ export function AppLayout() {
     try {
       const data = await createSourceFile(code, name, {
         forkFromId: sourceFileId ?? undefined,
-        format: currentFormat,
+        format: currentFormat ?? undefined,
       });
       appStore.trigger.setSourceFileId({ id: data.id });
 
