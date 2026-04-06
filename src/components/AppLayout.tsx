@@ -110,7 +110,8 @@ export function AppLayout() {
   useEffect(() => {
     if (isMobile || !codePanelRef.current) return;
     if (panelOpen) {
-      codePanelRef.current.expand();
+      const saved = localStorage.getItem('sketch:panelSize');
+      codePanelRef.current.resize(saved ? `${saved}%` : "50%");
     } else {
       codePanelRef.current.collapse();
     }
@@ -638,7 +639,6 @@ export function AppLayout() {
         >
           <ResizablePanel
             panelRef={vizPanelRef}
-            defaultSize={50}
             minSize={20}
             style={{ overflow: 'hidden' }}
           >
@@ -660,7 +660,6 @@ export function AppLayout() {
 
           <ResizablePanel
             panelRef={codePanelRef}
-            defaultSize={50}
             minSize={20}
             collapsible
             collapsedSize={0}
@@ -671,6 +670,9 @@ export function AppLayout() {
                 appStore.trigger.setDrawerOpen({ open: false });
               } else if (!collapsed && !panelOpen) {
                 appStore.trigger.setDrawerOpen({ open: true });
+              }
+              if (!collapsed) {
+                localStorage.setItem('sketch:panelSize', String(size.asPercentage));
               }
             }}
           >
