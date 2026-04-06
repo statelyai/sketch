@@ -18,6 +18,7 @@ import type {
   TransitionData,
   MachineGraph,
 } from '@/lib/machine';
+import { getEventCategory } from '@/lib/machine';
 import { appStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,14 @@ export function StateNodeViz({ node, graph, isInitial, isRegion }: StateNodeVizP
   const isFinal = data.type === 'final';
   const isParallel = data.type === 'parallel';
   const isHistory = data.type === 'history';
+  const isChoice =
+    isAtomic &&
+    data.invocations.length === 0 &&
+    outEdges.length > 1 &&
+    outEdges.every(
+      (e) =>
+        getEventCategory(e.data.eventType) === 'always' && e.data.guard,
+    );
 
   const sortedChildren = useMemo(() => {
     if (isParallel) return children; // parallel regions don't have ordering
@@ -83,6 +92,9 @@ export function StateNodeViz({ node, graph, isInitial, isRegion }: StateNodeVizP
             )}
             {isFinal && (
               <RiTargetLine className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            {isChoice && (
+              <span className="inline-block size-3 shrink-0 rotate-45 border-2 border-muted-foreground" />
             )}
             {isHistory && (
               <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-muted-foreground text-[0.5rem] font-bold leading-none text-muted-foreground">

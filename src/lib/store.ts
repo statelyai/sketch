@@ -270,7 +270,7 @@ export const appStore = createStore({
     drawerOpen: readPref('sketch:panelOpen', true),
     highlights: new Set<string>(),
     dark: readPref('sketch:dark', true),
-    format: 'xstate' as CodeFormat,
+    format: 'xstate' as CodeFormat | null,
     sourceFileId: null as string | null,
     sharing: 'idle' as 'idle' | 'saving' | 'copied' | 'error',
     sketchName: '' as string,
@@ -316,7 +316,7 @@ export const appStore = createStore({
       ...context,
       sharing: event.status,
     }),
-    setFormat: (context, event: { format: CodeFormat }) => ({
+    setFormat: (context, event: { format: CodeFormat | null }) => ({
       ...context,
       format: event.format,
     }),
