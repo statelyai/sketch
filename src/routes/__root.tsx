@@ -32,6 +32,15 @@ export const Route = createRootRoute({
         type: 'image/svg+xml',
       },
     ],
+    scripts: [
+      {
+        defer: true,
+        src: 'https://static.cloudflareinsights.com/beacon.min.js',
+        'data-cf-beacon': JSON.stringify({
+          token: '35d1455cdec84fda9fe47d5f6535fd4d',
+        }),
+      },
+    ],
   }),
   shellComponent: RootDocument,
 })
