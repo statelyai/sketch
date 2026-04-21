@@ -173,7 +173,7 @@ export function CodePanel({
         </div>
       </TabsContent>
 
-      <TabsContent value="simulation" className="min-h-0 flex-1 overflow-auto">
+      <TabsContent value="simulation" className="min-h-0 flex-1 overflow-hidden">
         <SimulationPanel />
       </TabsContent>
     </Tabs>

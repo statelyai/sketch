@@ -34,6 +34,9 @@ test.describe('Examples', () => {
       page.getByRole('button', { name: /Checkout/ }),
     ).toBeVisible();
     await expect(
+      page.getByRole('button', { name: /Counter/ }),
+    ).toBeVisible();
+    await expect(
       page.getByRole('button', { name: /Traffic Light/ }),
     ).toBeVisible();
     await expect(
@@ -97,6 +100,38 @@ test.describe('Examples', () => {
     ).toBeVisible();
 
     await expect(page.getByTestId('format-badge')).toHaveText('JSON');
+  });
+
+  test('simulates Counter example and shows assigned state and context', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: /Counter/ }).click();
+
+    await expect(page.getByTestId('machine-name')).toHaveText('counter');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await expect(page.getByTestId('simulation-state')).toContainText('"active"');
+    await expect(page.getByTestId('simulation-context')).toContainText('"count": 0');
+
+    await page.getByRole('button', { name: 'Start simulation from panel' }).click();
+
+    const contextPanel = page.getByTestId('simulation-context');
+    await expect(page.getByTestId('simulation-state')).toContainText('"active"');
+    await expect(contextPanel).toContainText('"count": 0');
+    await expect(contextPanel).toContainText('"step": 1');
+
+    await page.getByTestId('transition-event').filter({ hasText: 'INC' }).click();
+    await expect(contextPanel).toContainText('"count": 1');
+
+    await page.getByTestId('transition-event').filter({ hasText: 'STEP_5' }).click();
+    await expect(contextPanel).toContainText('"step": 5');
+
+    await page.getByTestId('transition-event').filter({ hasText: 'INC' }).click();
+    await expect(contextPanel).toContainText('"count": 6');
+
+    await page.getByTestId('transition-event').filter({ hasText: 'RESET' }).click();
+    await expect(contextPanel).toContainText('"count": 0');
+    await expect(contextPanel).toContainText('"step": 1');
   });
 
   test('loads Promise example (YAML format)', async ({ page }) => {

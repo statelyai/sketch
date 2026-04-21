@@ -308,6 +308,60 @@ const machine = setup({
 });`,
   },
   {
+    title: 'Counter',
+    description: 'Increment, decrement, change step size, and reset context with assign',
+    format: 'xstate',
+    code: `import { setup, assign } from 'xstate';
+
+const machine = setup({
+  types: {
+    context: {} as {
+      count: number;
+      step: number;
+    },
+    events: {} as
+      | { type: 'INC' }
+      | { type: 'DEC' }
+      | { type: 'STEP_5' }
+      | { type: 'RESET' },
+  },
+}).createMachine({
+  id: 'counter',
+  initial: 'active',
+  context: {
+    count: 0,
+    step: 1,
+  },
+  states: {
+    active: {
+      on: {
+        INC: {
+          actions: assign({
+            count: ({ context }) => context.count + context.step,
+          }),
+        },
+        DEC: {
+          actions: assign({
+            count: ({ context }) => context.count - context.step,
+          }),
+        },
+        STEP_5: {
+          actions: assign({
+            step: 5,
+          }),
+        },
+        RESET: {
+          actions: assign({
+            count: 0,
+            step: 1,
+          }),
+        },
+      },
+    },
+  },
+});`,
+  },
+  {
     title: 'Traffic Light',
     description: 'Timed traffic light with nested red states for pedestrian crossing and turn arrows',
     format: 'xstate',
