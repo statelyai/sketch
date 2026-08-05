@@ -122,11 +122,20 @@ function getSimMachine(
   return machine.provide(implementations);
 }
 
+/**
+ * Rebuild the snapshot by replaying the log.
+ *
+ * `input` matters for any machine whose context is a function of it — `context: ({ input }) => input`
+ * is a common shape for a machine that is handed its world at construction. Without it that context
+ * is `undefined`, and the first action to touch a context field fails at runtime rather than at the
+ * point the machine was started.
+ */
 export function computeSimSnapshot(
   machine: AnyStateMachine,
   events: SimEvent[],
+  input?: unknown,
 ): AnyMachineSnapshot {
-  let [state] = initialTransition(machine);
+  let [state] = initialTransition(machine, input as never);
   for (const { event } of events) {
     const [next] = transition(machine, state, event);
     state = next;
@@ -207,9 +216,15 @@ function applySimActions(actions: SimAction[]): void {
 export function getNextSimActiveIds(event: AnyEventObject): Set<string> {
   const ctx = appStore.getSnapshot().context;
   if (!ctx.simMachine || ctx.mode !== 'sim') return new Set();
-  const currentSnapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents);
-  const [next] = transition(ctx.simMachine, currentSnapshot, event);
-  return getActiveIds(next);
+  try {
+    const currentSnapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents, ctx.simInput);
+    const [next] = transition(ctx.simMachine, currentSnapshot, event);
+    return getActiveIds(next);
+  } catch {
+    // Hover preview must never throw: a machine whose actions need absent context would blank the
+    // page just because the pointer crossed a transition box.
+    return new Set();
+  }
 }
 
 /**
@@ -219,17 +234,26 @@ export function getNextSimActiveIds(event: AnyEventObject): Set<string> {
 export function getNextSimAllIds(event: AnyEventObject): Set<string> {
   const ctx = appStore.getSnapshot().context;
   if (!ctx.simMachine || ctx.mode !== 'sim') return new Set();
-  const currentSnapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents);
-  const [next] = transition(ctx.simMachine, currentSnapshot, event);
-  const nodes: Array<{ id: string }> = (next as any)._nodes ?? [];
-  return new Set(nodes.map((n) => n.id));
+  try {
+    const currentSnapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents, ctx.simInput);
+    const [next] = transition(ctx.simMachine, currentSnapshot, event);
+    const nodes: Array<{ id: string }> = (next as any)._nodes ?? [];
+    return new Set(nodes.map((n) => n.id));
+  } catch {
+    // See getNextSimActiveIds: a hover must not be able to throw.
+    return new Set();
+  }
 }
 
 export function getCurrentSimValue(): string | null {
   const ctx = appStore.getSnapshot().context;
   if (!ctx.simMachine || ctx.mode !== 'sim') return null;
-  const snapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents);
-  return JSON.stringify(snapshot.value);
+  try {
+    const snapshot = computeSimSnapshot(ctx.simMachine, ctx.simEvents, ctx.simInput);
+    return JSON.stringify(snapshot.value);
+  } catch {
+    return null;
+  }
 }
 
 function getInitialContext() {
@@ -287,6 +311,10 @@ export const appStore = createStore({
     simMachine: null as AnyStateMachine | null,
     simEvents: [] as SimEvent[],
     simActiveIds: new Set<string>(),
+    /** Machine `input`, for machines whose context is a function of it. */
+    simInput: undefined as unknown,
+    /** Last simulation failure, surfaced in the UI instead of thrown. */
+    simError: null as string | null,
   },
   on: {
     setGraph: (context, event: { graph: MachineGraph | null }) => ({
@@ -460,20 +488,31 @@ export const appStore = createStore({
       return { ...context, highlights: next };
     },
     // Simulation
-    startSim: (context, _event, enq) => {
+    startSim: (context, event: { input?: unknown } | undefined, enq) => {
       if (!context.machine || !context.graph) return context;
       const simMachine = getSimMachine(context.machine, context.graph);
-      const [snapshot, actions] = initialTransition(simMachine);
-      if (actions.length > 0 && enq) {
-        enq.effect(() => applySimActions(actions as SimAction[]));
+      const input = event?.input ?? context.simInput;
+      try {
+        const [snapshot, actions] = initialTransition(simMachine, input as never);
+        if (actions.length > 0 && enq) {
+          enq.effect(() => applySimActions(actions as SimAction[]));
+        }
+        return {
+          ...context,
+          mode: 'sim' as const,
+          simMachine,
+          simInput: input,
+          simError: null,
+          simEvents: [{ timestamp: Date.now(), event: { type: 'xstate.init' } }],
+          simActiveIds: getActiveIds(snapshot),
+        };
+      } catch (e) {
+        // A machine that needs input fails here rather than several clicks later.
+        return {
+          ...context,
+          simError: `Could not start: ${e instanceof Error ? e.message : String(e)}`,
+        };
       }
-      return {
-        ...context,
-        mode: 'sim' as const,
-        simMachine,
-        simEvents: [{ timestamp: Date.now(), event: { type: 'xstate.init' } }],
-        simActiveIds: getActiveIds(snapshot),
-      };
     },
     stopSim: (context) => {
       clearAllScheduledTimeouts();
@@ -483,41 +522,77 @@ export const appStore = createStore({
         simMachine: null,
         simEvents: [],
         simActiveIds: new Set<string>(),
+        simError: null,
       };
     },
     restartSim: (context) => {
       clearAllScheduledTimeouts();
       if (!context.simMachine) return context;
-      const snapshot = computeSimSnapshot(context.simMachine, []);
+      const snapshot = computeSimSnapshot(context.simMachine, [], context.simInput);
       return {
         ...context,
+        simError: null,
         simEvents: [],
         simActiveIds: getActiveIds(snapshot),
       };
     },
-    simSend: (context, event: { event: AnyEventObject }, enq) => {
+    /**
+     * Step backwards by discarding the last `count` events.
+     *
+     * Free, because the simulation is already event-sourced: `computeSimSnapshot` derives the whole
+     * snapshot from the log, so rewinding is truncation rather than an inverse transition (which
+     * would not exist — assigns are not invertible). Scheduled `after`/`raise` timeouts are cleared
+     * first, or a timer armed by a step we just undid would still fire.
+     */
+    simRewind: (context, event: { count: number }) => {
       if (!context.simMachine || context.mode !== 'sim') return context;
-      const prevSnapshot = computeSimSnapshot(
-        context.simMachine,
-        context.simEvents,
-      );
-      const nextEvents = [
-        ...context.simEvents,
-        { timestamp: Date.now(), event: event.event },
-      ];
-      const [nextSnapshot, nextActions] = transition(
-        context.simMachine,
-        prevSnapshot,
-        event.event,
-      );
-      if (nextActions.length > 0) {
-        enq.effect(() => applySimActions(nextActions as SimAction[]));
-      }
+      clearAllScheduledTimeouts();
+      // Never drop the synthetic `xstate.init` entry at index 0 — it is the initial snapshot.
+      const keep = Math.max(1, context.simEvents.length - Math.max(0, event.count));
+      const nextEvents = context.simEvents.slice(0, keep);
       return {
         ...context,
         simEvents: nextEvents,
-        simActiveIds: getActiveIds(nextSnapshot),
+        simError: null,
+        simActiveIds: getActiveIds(
+          computeSimSnapshot(context.simMachine, nextEvents, context.simInput),
+        ),
       };
+    },
+    simSend: (context, event: { event: AnyEventObject }, enq) => {
+      if (!context.simMachine || context.mode !== 'sim') return context;
+      try {
+        const prevSnapshot = computeSimSnapshot(
+          context.simMachine,
+          context.simEvents,
+          context.simInput,
+        );
+        const nextEvents = [
+          ...context.simEvents,
+          { timestamp: Date.now(), event: event.event },
+        ];
+        const [nextSnapshot, nextActions] = transition(
+          context.simMachine,
+          prevSnapshot,
+          event.event,
+        );
+        if (nextActions.length > 0) {
+          enq.effect(() => applySimActions(nextActions as SimAction[]));
+        }
+        return {
+          ...context,
+          simEvents: nextEvents,
+          simActiveIds: getActiveIds(nextSnapshot),
+          simError: null,
+        };
+      } catch (e) {
+        // An action that touches context the input never provided throws here. Report it and hold
+        // position, rather than letting it escape and blank the page.
+        return {
+          ...context,
+          simError: `${event.event.type} failed: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
     },
   },
 });

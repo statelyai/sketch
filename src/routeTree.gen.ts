@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as InspectRouteImport } from './routes/inspect'
+import { Route as GraphRouteImport } from './routes/graph'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VizSourceFileIdRouteImport } from './routes/viz/$sourceFileId'
 
 const InspectRoute = InspectRouteImport.update({
   id: '/inspect',
   path: '/inspect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GraphRoute = GraphRouteImport.update({
+  id: '/graph',
+  path: '/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,30 +37,34 @@ const VizSourceFileIdRoute = VizSourceFileIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/graph': typeof GraphRoute
   '/inspect': typeof InspectRoute
   '/viz/$sourceFileId': typeof VizSourceFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/graph': typeof GraphRoute
   '/inspect': typeof InspectRoute
   '/viz/$sourceFileId': typeof VizSourceFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/graph': typeof GraphRoute
   '/inspect': typeof InspectRoute
   '/viz/$sourceFileId': typeof VizSourceFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/inspect' | '/viz/$sourceFileId'
+  fullPaths: '/' | '/graph' | '/inspect' | '/viz/$sourceFileId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/inspect' | '/viz/$sourceFileId'
-  id: '__root__' | '/' | '/inspect' | '/viz/$sourceFileId'
+  to: '/' | '/graph' | '/inspect' | '/viz/$sourceFileId'
+  id: '__root__' | '/' | '/graph' | '/inspect' | '/viz/$sourceFileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GraphRoute: typeof GraphRoute
   InspectRoute: typeof InspectRoute
   VizSourceFileIdRoute: typeof VizSourceFileIdRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/inspect'
       fullPath: '/inspect'
       preLoaderRoute: typeof InspectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/graph': {
+      id: '/graph'
+      path: '/graph'
+      fullPath: '/graph'
+      preLoaderRoute: typeof GraphRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GraphRoute: GraphRoute,
   InspectRoute: InspectRoute,
   VizSourceFileIdRoute: VizSourceFileIdRoute,
 }
