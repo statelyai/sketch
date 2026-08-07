@@ -15,6 +15,7 @@ import { SimulationStepper } from '@/components/graph/SimulationStepper';
 import { machineToGraph, type MachineGraph } from '@/lib/machine';
 import { loadLocalMachine, NEC_DATA_DEAL_PATH } from '@/lib/loadLocalMachine';
 import { appStore } from '@/lib/store';
+import type { ActorId } from '@/lib/actors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -64,6 +65,7 @@ function GraphRoute() {
   // Seeded for the default target; cleared when another file is loaded, since the seed is
   // specific to this machine's context shape and would be misleading anywhere else.
   const [inputJson, setInputJson] = useState(NEC_SEED_INPUT);
+  const [focusedActor, setFocusedActor] = useState<ActorId | null>(null);
   const mode = useSelector(appStore, (s) => s.context.mode);
 
   const load = useCallback(async (target: string) => {
@@ -148,7 +150,12 @@ function GraphRoute() {
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
         <section className="min-h-0">
           {graph ? (
-            <GraphCanvas graph={graph} title={title} />
+            <GraphCanvas
+              graph={graph}
+              title={title}
+              focusedActor={focusedActor}
+              onFocusActor={setFocusedActor}
+            />
           ) : (
             <div className="flex h-full items-center justify-center">
               <p className="text-xs text-muted-foreground">
@@ -161,6 +168,7 @@ function GraphRoute() {
           {graph ? (
             <SimulationStepper
               graph={graph}
+              machineId={title}
               inputJson={inputJson}
               onInputJsonChange={setInputJson}
             />

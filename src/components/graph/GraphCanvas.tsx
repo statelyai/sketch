@@ -11,6 +11,7 @@ import { useSelector } from '@xstate/store-react';
 import { RiAddLine, RiSubtractLine, RiFocus3Line } from '@remixicon/react';
 import { layoutMachine, type Layout } from '@/lib/layout';
 import type { MachineGraph } from '@/lib/machine';
+import { actorForEvent, ballInCourt, type Actor, type ActorId } from '@/lib/actors';
 import { appStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { StateNode } from './StateNode';
@@ -24,11 +25,14 @@ const FIT_PADDING = 48;
 
 interface GraphCanvasProps {
   graph: MachineGraph;
-  /** Machine id, rendered in the frame label like the root bar in Stately's canvas. */
+  /** Machine id: the frame label, and the key for the declared actor map. */
   title?: string;
+  /** Dim everything that is not this actor's move. */
+  focusedActor: ActorId | null;
+  onFocusActor: (actor: ActorId | null) => void;
 }
 
-export function GraphCanvas({ graph, title }: GraphCanvasProps) {
+export function GraphCanvas({ graph, title, focusedActor, onFocusActor }: GraphCanvasProps) {
   const [layout, setLayout] = useState<Layout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -44,7 +48,9 @@ export function GraphCanvas({ graph, title }: GraphCanvasProps) {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    layoutMachine(graph)
+    layoutMachine(graph, {
+      actorLabelOf: (eventType) => actorForEvent(title, eventType)?.short ?? null,
+    })
       .then((result) => {
         if (!cancelled) setLayout(result);
       })
@@ -54,7 +60,7 @@ export function GraphCanvas({ graph, title }: GraphCanvasProps) {
     return () => {
       cancelled = true;
     };
-  }, [graph]);
+  }, [graph, title]);
 
   const fit = useCallback(() => {
     const viewport = viewportRef.current;
@@ -160,6 +166,27 @@ export function GraphCanvas({ graph, title }: GraphCanvasProps) {
     return enabled;
   }, [layout, simActiveIds]);
 
+  /** Which parties owe a move from each state. */
+  const waitingByState = useMemo(() => {
+    const byState = new Map<string, Actor[]>();
+    for (const node of graph.nodes) {
+      const outgoing = graph.edges.filter((e) => e.sourceId === node.id);
+      const { waitingOn } = ballInCourt(outgoing.map((e) => actorForEvent(title, e.data.eventType)));
+      byState.set(node.id, waitingOn);
+    }
+    return byState;
+  }, [graph, title]);
+
+  /** Actors that actually appear in this machine, for the legend. */
+  const presentActors = useMemo(() => {
+    const seen = new Map<ActorId, Actor>();
+    for (const edge of graph.edges) {
+      const actor = actorForEvent(title, edge.data.eventType);
+      if (actor) seen.set(actor.id, actor);
+    }
+    return [...seen.values()];
+  }, [graph, title]);
+
   const emphasisedEdges = useMemo(() => {
     const ids = new Set<string>();
     if (!layout) return ids;
@@ -225,12 +252,19 @@ export function GraphCanvas({ graph, title }: GraphCanvasProps) {
 
             {layout.nodes.map((node) =>
               node.kind === 'state' ? (
-                <StateNode key={node.id} node={node} isActive={simActiveIds.has(node.id)} />
+                <StateNode
+                  key={node.id}
+                  node={node}
+                  isActive={simActiveIds.has(node.id)}
+                  waitingOn={waitingByState.get(node.id) ?? []}
+                />
               ) : (
                 <TransitionNode
                   key={node.id}
                   node={node}
                   isEnabled={!isSim || enabledTransitionIds.has(node.id)}
+                  actor={actorForEvent(title, node.data.eventType)}
+                  focusedActor={focusedActor}
                 />
               ),
             )}
@@ -256,6 +290,42 @@ export function GraphCanvas({ graph, title }: GraphCanvasProps) {
           <RiFocus3Line className="size-4" />
         </Button>
       </div>
+
+      {/* Actor legend. Click one to isolate that party's moves. */}
+      {presentActors.length > 0 && (
+        <div className="absolute left-3 top-3 flex flex-col gap-0.5 rounded-md border border-border bg-card/90 p-1.5 backdrop-blur">
+          <span className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Who acts
+          </span>
+          {presentActors.map((actor) => (
+            <button
+              key={actor.id}
+              type="button"
+              onClick={() => onFocusActor(focusedActor === actor.id ? null : actor.id)}
+              className={cn(
+                'flex items-center gap-1.5 rounded px-1 py-0.5 text-left text-[10px] transition-colors hover:bg-muted',
+                focusedActor === actor.id && 'bg-muted',
+                focusedActor !== null && focusedActor !== actor.id && 'opacity-45',
+              )}
+            >
+              <span className={cn('size-2 shrink-0 rounded-full', actor.className.dot)} />
+              <span className={cn('font-medium', actor.className.text)}>{actor.label}</span>
+              {!actor.isParty && (
+                <span className="text-[9px] text-muted-foreground">· not a party</span>
+              )}
+            </button>
+          ))}
+          {focusedActor && (
+            <button
+              type="button"
+              onClick={() => onFocusActor(null)}
+              className="mt-0.5 text-left text-[9px] text-muted-foreground underline decoration-dotted hover:text-foreground"
+            >
+              clear focus
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="pointer-events-none absolute bottom-3 left-3 font-mono text-[10px] text-muted-foreground">
         {Math.round(transform.scale * 100)}%

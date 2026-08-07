@@ -8,6 +8,7 @@
 import { useSelector } from '@xstate/store-react';
 import { RiLayoutColumnLine, RiStopCircleLine } from '@remixicon/react';
 import type { LaidOutState } from '@/lib/layout';
+import type { Actor } from '@/lib/actors';
 import { appStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -15,9 +16,16 @@ interface StateNodeProps {
   node: LaidOutState;
   /** True when this state is part of the simulated active configuration. */
   isActive: boolean;
+  /**
+   * The parties who may act from here — "ball in court".
+   *
+   * Empty when the only way out is a chain observation or a deadline: then nobody owes a move and
+   * the deal is waiting on the world, which is a different situation from someone being late.
+   */
+  waitingOn: Actor[];
 }
 
-export function StateNode({ node, isActive }: StateNodeProps) {
+export function StateNode({ node, isActive, waitingOn }: StateNodeProps) {
   const { data } = node;
   const isHighlighted = useSelector(appStore, (s) => s.context.highlights.has(node.id));
 
@@ -75,6 +83,18 @@ export function StateNode({ node, isActive }: StateNodeProps) {
         >
           {data.key}
         </span>
+
+        {/* Whose move it is from here: one dot per party, in that party's colour. */}
+        {!isCompound && waitingOn.length > 0 && (
+          <span
+            className="ml-auto flex shrink-0 items-center gap-0.5"
+            title={`Waiting on: ${waitingOn.map((a) => a.label).join(', ')}`}
+          >
+            {waitingOn.map((actor) => (
+              <span key={actor.id} className={cn('size-1.5 rounded-full', actor.className.dot)} />
+            ))}
+          </span>
+        )}
       </div>
     </div>
   );

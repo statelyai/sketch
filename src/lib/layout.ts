@@ -93,13 +93,19 @@ const ICON_W = 14;
 
 const textWidth = (s: string, per: number) => s.length * per;
 
-/** Estimated size of a transition box, from its event, guard and action list. */
-function transitionSize(d: TransitionData): { width: number; height: number } {
+/**
+ * Estimated size of a transition box, from its event, guard, actor label and action list.
+ *
+ * `actorLabel` is measured rather than allowanced, because the labels differ in length (BUYER vs
+ * ANYONE) and a fixed allowance would either clip the long ones or pad every box for the short ones.
+ */
+function transitionSize(d: TransitionData, actorLabel: string | null): { width: number; height: number } {
   const category = getEventCategory(d.eventType);
   const eventLabel = d.displayEvent || (category === 'always' ? 'always' : d.eventType);
 
   let headerW = textWidth(eventLabel, MONO_11);
   if (category !== null) headerW += ICON_W; // timer / always / done / error icon
+  if (actorLabel) headerW += textWidth(actorLabel, MONO_11) + 10; // actor chip + gap
   if (d.guardPrefix) headerW += textWidth(d.guardPrefix, MONO_11) + 6;
   if (d.guard) headerW += textWidth(d.guard, MONO_11) + ICON_W + 6; // diamond + guard name
 
@@ -202,7 +208,13 @@ const LAYOUT_OPTIONS: Record<string, string> = {
  * Async because ELK is async even in its bundled synchronous-looking form. The caller renders
  * nothing until this resolves, which is fine: layout of a 40-node graph is a few milliseconds.
  */
-export async function layoutMachine(graph: MachineGraph): Promise<Layout> {
+export async function layoutMachine(
+  graph: MachineGraph,
+  options: {
+    /** Short actor label per event type, so its chip is included in box sizing. */
+    actorLabelOf?: (eventType: string) => string | null;
+  } = {},
+): Promise<Layout> {
   const root = graph.nodes.find((n) => n.parentId === null);
   if (!root) return { nodes: [], edges: [], width: 0, height: 0 };
 
@@ -229,7 +241,7 @@ export async function layoutMachine(graph: MachineGraph): Promise<Layout> {
     const targetId = data.isTargetless ? edge.sourceId : edge.targetId;
     const container = elkById.get(containerFor(graph, edge.sourceId, targetId, root.id))!;
     const boxId = `t:${edge.id}`;
-    const size = transitionSize(data);
+    const size = transitionSize(data, options.actorLabelOf?.(data.eventType) ?? null);
 
     container.children.push({ id: boxId, ...size });
     container.edges.push(

@@ -16,6 +16,7 @@ import {
   RiCloseCircleFill,
 } from '@remixicon/react';
 import type { LaidOutTransition } from '@/lib/layout';
+import type { Actor, ActorId } from '@/lib/actors';
 import { getEventCategory } from '@/lib/machine';
 import { appStore, getNextSimAllIds } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -37,9 +38,13 @@ interface TransitionNodeProps {
   node: LaidOutTransition;
   /** True when the source state is active, so this event could fire right now. */
   isEnabled: boolean;
+  /** Who submits this event. `null` when nothing in the model attributes it. */
+  actor: Actor | null;
+  /** When set, transitions belonging to other actors are dimmed. */
+  focusedActor: ActorId | null;
 }
 
-export function TransitionNode({ node, isEnabled }: TransitionNodeProps) {
+export function TransitionNode({ node, isEnabled, actor, focusedActor }: TransitionNodeProps) {
   const { data } = node;
   const mode = useSelector(appStore, (s) => s.context.mode);
   const isSim = mode === 'sim';
@@ -55,6 +60,9 @@ export function TransitionNode({ node, isEnabled }: TransitionNodeProps) {
   };
 
   const clickable = isSim && isEnabled && category !== 'always';
+  // Actor focus dims everything that is not this actor's move, so one party's obligations can be
+  // read off the chart at a glance.
+  const outOfFocus = focusedActor !== null && actor?.id !== focusedActor;
 
   return (
     <div
@@ -64,8 +72,11 @@ export function TransitionNode({ node, isEnabled }: TransitionNodeProps) {
       className={cn(
         'absolute flex flex-col justify-center gap-0.5 rounded-md border bg-card/80 px-2 py-1 backdrop-blur-sm transition-[border-color,opacity,background-color] duration-150',
         'border-border/80 shadow-[0_1px_2px_rgba(0,0,0,0.3)]',
+        // A 3px stripe in the actor's colour: readable even when zoomed out past the label.
+        actor && `border-l-[3px] ${actor.className.border}`,
         isHighlighted && 'border-primary',
         isSim && !isEnabled && 'opacity-35',
+        outOfFocus && 'opacity-20',
         clickable && 'cursor-pointer hover:border-primary hover:bg-primary/10',
       )}
       onClick={() => {
@@ -90,6 +101,19 @@ export function TransitionNode({ node, isEnabled }: TransitionNodeProps) {
         {category === 'always' && <RiInfinityLine className="size-3 shrink-0 text-muted-foreground" />}
         {category === 'done' && <RiCheckboxCircleFill className="size-3 shrink-0 text-green-500" />}
         {category === 'error' && <RiCloseCircleFill className="size-3 shrink-0 text-red-500" />}
+
+        {actor && (
+          <span
+            className={cn(
+              'shrink-0 rounded-sm px-1 text-[9px] font-bold tracking-wider',
+              actor.className.bg,
+              actor.className.text,
+            )}
+            title={actor.label}
+          >
+            {actor.short}
+          </span>
+        )}
 
         <span className="font-mono text-[10px] font-semibold tracking-wide text-foreground">
           {eventLabel}

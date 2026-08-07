@@ -29,6 +29,7 @@ import {
   RiBracesLine,
 } from '@remixicon/react';
 import { getEventCategory, type MachineGraph, type TransitionData } from '@/lib/machine';
+import { actorForEvent, ballInCourt, type Actor } from '@/lib/actors';
 import { appStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -43,10 +44,14 @@ interface Step {
   actions: string[];
   targetKey: string;
   sourceKey: string;
+  /** Who submits it. */
+  actor: Actor | null;
 }
 
 interface SimulationStepperProps {
   graph: MachineGraph;
+  /** Machine id — the key for the declared actor map. */
+  machineId?: string;
   /**
    * Starting `input` for the machine, as JSON text.
    *
@@ -57,7 +62,12 @@ interface SimulationStepperProps {
   onInputJsonChange: (next: string) => void;
 }
 
-export function SimulationStepper({ graph, inputJson, onInputJsonChange }: SimulationStepperProps) {
+export function SimulationStepper({
+  graph,
+  machineId,
+  inputJson,
+  onInputJsonChange,
+}: SimulationStepperProps) {
   const mode = useSelector(appStore, (s) => s.context.mode);
   const simEvents = useSelector(appStore, (s) => s.context.simEvents);
   const simActiveIds = useSelector(appStore, (s) => s.context.simActiveIds);
@@ -106,16 +116,35 @@ export function SimulationStepper({ graph, inputJson, onInputJsonChange }: Simul
           guard: data.guard,
           guardPrefix: data.guardPrefix,
           actions: data.actions,
+          actor: actorForEvent(machineId, data.eventType),
           sourceKey: keyById.get(edge.sourceId) ?? edge.sourceId,
           targetKey: data.isTargetless
             ? (keyById.get(edge.sourceId) ?? '(self)')
             : (keyById.get(edge.targetId) ?? edge.targetId),
         };
       });
-  }, [graph, simActiveIds, isSim, keyById]);
+  }, [graph, simActiveIds, isSim, keyById, machineId]);
 
-  /** Everything sent so far, minus the synthetic init entry. */
-  const trace = simEvents.slice(1);
+  /**
+   * Whose move it is now.
+   *
+   * Parties only. If the only things available are a chain observation or a deadline, nobody owes a
+   * move — the deal waits on the world, and claiming "seller's turn" there would be false.
+   */
+  const turn = useMemo(
+    () => ballInCourt(availableSteps.map((s) => s.actor)),
+    [availableSteps],
+  );
+
+  /** Everything sent so far, minus the synthetic init entry, with its actor resolved. */
+  const trace = useMemo(
+    () =>
+      simEvents.slice(1).map((entry) => ({
+        ...entry,
+        actor: actorForEvent(machineId, entry.event.type),
+      })),
+    [simEvents, machineId],
+  );
 
   const activeStateKeys = useMemo(() => {
     // Leaf states only — showing every ancestor turns "where am I" into a list.
@@ -319,6 +348,42 @@ export function SimulationStepper({ graph, inputJson, onInputJsonChange }: Simul
             </div>
           </div>
 
+          {/* Whose move */}
+          <div>
+            <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Whose turn
+            </h3>
+            {turn.waitingOn.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1">
+                {turn.waitingOn.map((actor) => (
+                  <span
+                    key={actor.id}
+                    className={cn(
+                      'flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium',
+                      actor.className.bg,
+                      actor.className.text,
+                    )}
+                  >
+                    <span className={cn('size-1.5 rounded-full', actor.className.dot)} />
+                    {actor.label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                {availableSteps.length === 0
+                  ? 'Nobody — terminal state.'
+                  : 'Nobody. Waiting on the chain or a deadline, not on a party.'}
+              </p>
+            )}
+            {turn.nonParty.length > 0 && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Also possible without a party acting:{' '}
+                {turn.nonParty.map((a) => a.label).join(', ')}.
+              </p>
+            )}
+          </div>
+
           {/* What can happen next */}
           <div>
             <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -355,7 +420,19 @@ export function SimulationStepper({ graph, inputJson, onInputJsonChange }: Simul
                       onMouseEnter={() => appStore.trigger.highlight({ ids: [step.key] })}
                       onMouseLeave={() => appStore.trigger.unhighlight({ ids: [step.key] })}
                     >
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                        {step.actor && (
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-sm px-1 text-[9px] font-bold tracking-wider',
+                              step.actor.className.bg,
+                              step.actor.className.text,
+                            )}
+                            title={step.actor.label}
+                          >
+                            {step.actor.short}
+                          </span>
+                        )}
                         <span className="font-mono text-[11px] font-semibold">{step.label}</span>
                         {step.guard && (
                           <>
@@ -365,7 +442,9 @@ export function SimulationStepper({ graph, inputJson, onInputJsonChange }: Simul
                                 {step.guardPrefix}
                               </span>
                             )}
-                            <span className="font-mono text-[10px] text-primary">{step.guard}</span>
+                            <span className="min-w-0 break-all font-mono text-[10px] text-primary">
+                              {step.guard}
+                            </span>
                           </>
                         )}
                       </span>
@@ -401,6 +480,20 @@ export function SimulationStepper({ graph, inputJson, onInputJsonChange }: Simul
                     className="flex items-center gap-2 rounded-sm px-1 py-0.5 font-mono text-[10px]"
                   >
                     <span className="w-4 shrink-0 text-right text-muted-foreground">{i + 1}</span>
+                    {entry.actor ? (
+                      <span
+                        className={cn(
+                          'w-14 shrink-0 rounded-sm px-1 text-center text-[9px] font-bold tracking-wider',
+                          entry.actor.className.bg,
+                          entry.actor.className.text,
+                        )}
+                        title={entry.actor.label}
+                      >
+                        {entry.actor.short}
+                      </span>
+                    ) : (
+                      <span className="w-14 shrink-0" />
+                    )}
                     <span className="truncate text-foreground">{entry.event.type}</span>
                     {i === trace.length - 1 && (
                       <button
